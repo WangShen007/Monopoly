@@ -1,0 +1,14 @@
+C:\fu\MonopolyModels\bin\Debug\net8.0\MonopolyModels.deps.json
+C:\fu\MonopolyModels\bin\Debug\net8.0\MonopolyModels.runtimeconfig.json
+C:\fu\MonopolyModels\bin\Debug\net8.0\MonopolyModels.dll
+C:\fu\MonopolyModels\bin\Debug\net8.0\MonopolyModels.pdb
+C:\fu\MonopolyModels\obj\Debug\net8.0\MonopolyModels.csproj.AssemblyReference.cache
+C:\fu\MonopolyModels\obj\Debug\net8.0\MonopolyModels.GeneratedMSBuildEditorConfig.editorconfig
+C:\fu\MonopolyModels\obj\Debug\net8.0\MonopolyModels.AssemblyInfoInputs.cache
+C:\fu\MonopolyModels\obj\Debug\net8.0\MonopolyModels.AssemblyInfo.cs
+C:\fu\MonopolyModels\obj\Debug\net8.0\MonopolyModels.csproj.CoreCompileInputs.cache
+C:\fu\MonopolyModels\obj\Debug\net8.0\MonopolyModels.dll
+C:\fu\MonopolyModels\obj\Debug\net8.0\refint\MonopolyModels.dll
+C:\fu\MonopolyModels\obj\Debug\net8.0\MonopolyModels.pdb
+C:\fu\MonopolyModels\obj\Debug\net8.0\MonopolyModels.genruntimeconfig.cache
+C:\fu\MonopolyModels\obj\Debug\net8.0\ref\MonopolyModels.dll

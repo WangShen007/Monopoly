@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="MonopolyClient/MonopolyClient.csproj" />
+  <Project Path="MonopolyModels/MonopolyModels.csproj" />
+  <Project Path="MonopolyServer/MonopolyServer.csproj" />
+  <Project Path="MonopolyTests/MonopolyTests.csproj" />
+</Solution>
