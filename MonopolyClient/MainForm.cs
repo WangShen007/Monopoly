@@ -36,6 +36,7 @@ public class MainForm : Form
     private BindingList<MapCellRow> _mapRows = [];
     private BindingList<PropertyRow> _propertyRows = [];
     private BindingList<EventCardRow> _eventRows = [];
+    private string _lastGameStatus = "";
 
     public MainForm()
     {
@@ -260,9 +261,12 @@ public class MainForm : Form
                 case "RegisterResult":
                 case "CreateRoomResult":
                 case "JoinRoomResult":
-                case "LeaveRoomResult":
                 case "ReadyResult":
                 case "BuyPropertyResult":
+                    ShowBasic(message.ReadData<BasicResult>());
+                    break;
+                case "LeaveRoomResult":
+                    _lastGameStatus = "";
                     ShowBasic(message.ReadData<BasicResult>());
                     break;
                 case "LoginResult":
@@ -288,6 +292,7 @@ public class MainForm : Form
                     break;
                 case "GameOver":
                     var over = message.ReadData<GameOverDto>();
+                    _lastGameStatus = "";
                     MessageBox.Show(this, $"游戏结束，获胜者：{over.WinnerUserName}", "GameOver", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     break;
                 case "Error":
@@ -321,6 +326,16 @@ public class MainForm : Form
 
     private void ApplyGameState(GameStateDto state)
     {
+        // 游戏开始时自动切换到"游戏"标签页
+        if (state.Status == "Playing" && _lastGameStatus != "Playing")
+        {
+            if (_tabs.TabPages.Count > 1)
+            {
+                _tabs.SelectedIndex = 1;
+            }
+        }
+        _lastGameStatus = state.Status;
+
         _lblTurn.Text = state.Status == "Playing"
             ? $"房间 {state.RoomId} | 第 {state.RoundNumber} 回合 | 当前：{state.CurrentPlayerName}"
             : $"房间 {state.RoomId} | 状态：{state.Status}";
