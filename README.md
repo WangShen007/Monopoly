@@ -1,3 +1,28 @@
+<div align="center">
+
+<!-- 霓虹灯渐变动效 -->
+<p align="center">
+  <img src="https://readme-typing-svg.herokuapp.com?font=Fira+Code&size=30&duration=3000&pause=1000&color=FF6B6B&center=true&vCenter=true&width=700&lines=%F0%9F%8E%AE+%E8%BF%99%E6%98%AF%E6%88%91%E4%BB%AC%E7%9A%842023%E7%BA%A7%E7%BD%91%E7%BB%9C%E5%BA%94%E7%94%A8%E7%BC%96%E7%A8%8B%E5%A4%A7%E4%BD%9C%E4%B8%9A+%F0%9F%8E%AE;%E2%9C%A8+%E6%88%91%E4%BB%AC%E6%AD%A3%E5%9C%A8%E4%BA%AB%E5%8F%97%E5%AE%83+%E2%9C%A8" alt="Typing Animation" />
+</p>
+
+<!-- 渐变分隔线 -->
+<img src="https://user-images.githubusercontent.com/73097560/115834477-dbab4500-a447-11eb-908a-139a6edaec5c.gif" width="100%">
+
+<br>
+
+<!-- 动态徽章 -->
+<p align="center">
+  <img src="https://img.shields.io/badge/C%23-9.0-239120?style=for-the-badge&logo=c-sharp&logoColor=white" alt="C#" />
+  <img src="https://img.shields.io/badge/.NET-8.0-512BD4?style=for-the-badge&logo=dotnet&logoColor=white" alt=".NET" />
+  <img src="https://img.shields.io/badge/TCP-Socket-00ADD8?style=for-the-badge&logo=websocket&logoColor=white" alt="TCP" />
+  <img src="https://img.shields.io/badge/EF%20Core-SQLite-003B57?style=for-the-badge&logo=sqlite&logoColor=white" alt="SQLite" />
+  <img src="https://img.shields.io/badge/WinForms-UI-0078D6?style=for-the-badge&logo=windows&logoColor=white" alt="WinForms" />
+</p>
+
+<br>
+
+</div>
+
 # 多人回合制地产经营游戏系统
 
 这是 `基于CS架构的多人回合制地产经营游戏系统_实现思路.pdf` 对应的 C# 课程设计实现，项目根目录为 `C:\fu`。
