@@ -24,10 +24,49 @@ public class MainForm : Form
     private readonly TextBox _txtRoomName = new() { Text = "河南文旅房间", Width = 180 };
     private readonly NumericUpDown _numMaxPlayers = new() { Minimum = 2, Maximum = 4, Value = 2, Width = 60 };
     private readonly BoardView _boardView = new() { Dock = DockStyle.Fill };
-    private readonly DataGridView _playerGrid = Grid();
+    private readonly FlowLayoutPanel _playerCards = new()
+    {
+        Dock = DockStyle.Fill,
+        FlowDirection = FlowDirection.TopDown,
+        WrapContents = false,
+        AutoScroll = true,
+        Padding = new Padding(2),
+        BackColor = Color.FromArgb(245, 236, 207)
+    };
+    private readonly FlowLayoutPanel _chatMessages = new()
+    {
+        Dock = DockStyle.Fill,
+        FlowDirection = FlowDirection.TopDown,
+        WrapContents = false,
+        AutoScroll = true,
+        Padding = new Padding(2),
+        BackColor = Color.FromArgb(252, 248, 235)
+    };
+    private readonly TextBox _txtChat = new()
+    {
+        Dock = DockStyle.Fill,
+        MaxLength = 80
+    };
     private readonly DataGridView _propertyGrid = Grid();
     private readonly ListBox _logList = new() { Dock = DockStyle.Fill, IntegralHeight = false };
-    private readonly Label _lblTurn = new() { AutoSize = true, Text = "当前回合：-" };
+    private readonly Label _lblTurn = new()
+    {
+        AutoSize = false,
+        Dock = DockStyle.Fill,
+        Text = "当前回合：-",
+        TextAlign = ContentAlignment.MiddleLeft,
+        Font = new Font("Microsoft YaHei UI", 10F, FontStyle.Bold),
+        ForeColor = Color.FromArgb(64, 44, 25)
+    };
+    private readonly Label _lblActionHint = new()
+    {
+        AutoSize = false,
+        Dock = DockStyle.Fill,
+        Text = "等待开局",
+        TextAlign = ContentAlignment.MiddleLeft,
+        ForeColor = Color.FromArgb(92, 67, 38)
+    };
+    private readonly PictureBox _dicePicture = new() { Width = 58, Height = 58, SizeMode = PictureBoxSizeMode.Zoom };
     private readonly Button _btnRoll = new() { Text = "掷骰子", Width = 92, Height = 34 };
     private readonly Button _btnBuy = new() { Text = "购买地产", Width = 92, Height = 34 };
     private readonly Button _btnEnd = new() { Text = "结束回合", Width = 92, Height = 34 };
@@ -44,6 +83,7 @@ public class MainForm : Form
     private BindingList<PropertyRow> _propertyRows = [];
     private BindingList<EventCardRow> _eventRows = [];
     private string _lastGameStatus = "";
+    private int? _currentRoomId;
 
     public MainForm()
     {
@@ -287,24 +327,107 @@ public class MainForm : Form
         boardHost.Controls.Add(_boardView);
         layout.Controls.Add(boardHost, 0, 0);
 
-        var side = new TableLayoutPanel { Dock = DockStyle.Fill, RowCount = 6, Padding = new Padding(8) };
-        side.RowStyles.Add(new RowStyle(SizeType.Absolute, 36));
+        var side = new TableLayoutPanel { Dock = DockStyle.Fill, RowCount = 5, Padding = new Padding(8) };
+        side.RowStyles.Add(new RowStyle(SizeType.Absolute, 54));
         side.RowStyles.Add(new RowStyle(SizeType.Absolute, 70));
-        side.RowStyles.Add(new RowStyle(SizeType.Percent, 26));
-        side.RowStyles.Add(new RowStyle(SizeType.Percent, 28));
-        side.RowStyles.Add(new RowStyle(SizeType.Percent, 28));
-        side.RowStyles.Add(new RowStyle(SizeType.Percent, 18));
+        side.RowStyles.Add(new RowStyle(SizeType.Percent, 34));
+        side.RowStyles.Add(new RowStyle(SizeType.Percent, 34));
+        side.RowStyles.Add(new RowStyle(SizeType.Percent, 32));
 
         var controls = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = false };
-        controls.Controls.AddRange([_btnRoll, _btnBuy, _btnEnd]);
-        side.Controls.Add(_lblTurn, 0, 0);
+        controls.Controls.AddRange([_dicePicture, _btnRoll, _btnBuy, _btnEnd]);
+        side.Controls.Add(BuildTurnStatusPanel(), 0, 0);
         side.Controls.Add(controls, 0, 1);
-        side.Controls.Add(Group("玩家状态", _playerGrid), 0, 2);
-        side.Controls.Add(Group("地产状态", _propertyGrid), 0, 3);
-        side.Controls.Add(Group("游戏日志", _logList), 0, 4);
-        side.Controls.Add(new Panel { BackColor = Color.Transparent }, 0, 5);
+        side.Controls.Add(Group("玩家状态", _playerCards), 0, 2);
+        side.Controls.Add(BuildChatPanel(), 0, 3);
+        side.Controls.Add(Group("详情", BuildDetailTabs()), 0, 4);
         layout.Controls.Add(side, 1, 0);
         return page;
+    }
+
+    private Control BuildTurnStatusPanel()
+    {
+        var panel = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            RowCount = 2,
+            BackColor = Color.FromArgb(245, 236, 207),
+            Padding = new Padding(8, 4, 8, 4)
+        };
+        panel.RowStyles.Add(new RowStyle(SizeType.Percent, 55));
+        panel.RowStyles.Add(new RowStyle(SizeType.Percent, 45));
+        panel.Controls.Add(_lblTurn, 0, 0);
+        panel.Controls.Add(_lblActionHint, 0, 1);
+        return panel;
+    }
+
+    private Control BuildChatPanel()
+    {
+        var layout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            RowCount = 4,
+            BackColor = Color.FromArgb(245, 236, 207),
+            Padding = new Padding(2)
+        };
+        layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 34));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 36));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 34));
+
+        var quick = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            WrapContents = false,
+            AutoScroll = true,
+            BackColor = Color.Transparent
+        };
+        foreach (var text in new[] { "我等到花儿也谢了", "不要走，决战到天亮", "快点吧", "这把稳了" })
+        {
+            quick.Controls.Add(SmallButton(text, () => SendQuickChat(text)));
+        }
+
+        var input = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, BackColor = Color.Transparent };
+        input.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        input.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 68));
+        input.Controls.Add(_txtChat, 0, 0);
+        input.Controls.Add(SmallButton("发送", SendChatFromInput), 1, 0);
+
+        var tools = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            WrapContents = false,
+            BackColor = Color.Transparent
+        };
+        tools.Controls.Add(SmallButton("扔鸡蛋", () => SendReaction("Egg")));
+        tools.Controls.Add(SmallButton("送鲜花", () => SendReaction("Flower")));
+        tools.Controls.Add(SmallButton("喝彩", () => SendReaction("Cheer")));
+        tools.Controls.Add(new Button
+        {
+            Text = "语音待实现",
+            Enabled = false,
+            AutoSize = true,
+            Height = 28,
+            Margin = new Padding(4, 3, 4, 3)
+        });
+
+        layout.Controls.Add(_chatMessages, 0, 0);
+        layout.Controls.Add(quick, 0, 1);
+        layout.Controls.Add(input, 0, 2);
+        layout.Controls.Add(tools, 0, 3);
+        return Group("聊天互动", layout);
+    }
+
+    private Control BuildDetailTabs()
+    {
+        var tabs = new TabControl { Dock = DockStyle.Fill };
+        var propertyPage = new TabPage("地产") { BackColor = Color.FromArgb(245, 236, 207), Padding = new Padding(4) };
+        var logPage = new TabPage("日志") { BackColor = Color.FromArgb(245, 236, 207), Padding = new Padding(4) };
+        propertyPage.Controls.Add(_propertyGrid);
+        logPage.Controls.Add(_logList);
+        tabs.TabPages.Add(propertyPage);
+        tabs.TabPages.Add(logPage);
+        return tabs;
     }
 
     private TabPage BuildManageTab()
@@ -341,6 +464,16 @@ public class MainForm : Form
         _btnRoll.Click += (_, _) => SendAsync("RollDice");
         _btnBuy.Click += (_, _) => SendAsync("BuyProperty");
         _btnEnd.Click += (_, _) => SendAsync("EndTurn");
+        _playerCards.Resize += (_, _) => ResizePlayerCards();
+        _chatMessages.Resize += (_, _) => ResizeChatMessages();
+        _txtChat.KeyDown += (_, e) =>
+        {
+            if (e.KeyCode == Keys.Enter)
+            {
+                e.SuppressKeyPress = true;
+                SendChatFromInput();
+            }
+        };
     }
 
     private async void ConnectAsync()
@@ -407,6 +540,8 @@ public class MainForm : Form
                     break;
                 case "LeaveRoomResult":
                     _lastGameStatus = "";
+                    _currentRoomId = null;
+                    ClearChatMessages();
                     ShowBasic(message.ReadData<BasicResult>());
                     break;
                 case "LoginResult":
@@ -426,6 +561,9 @@ public class MainForm : Form
                     break;
                 case "HistoryResult":
                     _historyGrid.DataSource = message.ReadData<HistoryResult>().Records;
+                    break;
+                case "ChatMessage":
+                    AddChatMessage(message.ReadData<ChatMessageDto>());
                     break;
                 case "YourTurn":
                     SetStatus("轮到你行动", false);
@@ -483,6 +621,11 @@ public class MainForm : Form
         {
             _tabs.SelectedIndex = 1;
         }
+        if (_currentRoomId != state.RoomId)
+        {
+            _currentRoomId = state.RoomId;
+            ClearChatMessages();
+        }
         _lastGameStatus = state.Status;
 
         _lblTurn.Text = state.Status == "Playing"
@@ -490,10 +633,306 @@ public class MainForm : Form
             : $"房间 {state.RoomId} | 状态：{state.Status}";
 
         _boardView.ApplyState(state);
-        _playerGrid.DataSource = state.Players;
+        RenderPlayerCards(state);
         _propertyGrid.DataSource = state.Properties;
         _logList.DataSource = state.Logs.ToList();
-        SetGameButtons(state.Status == "Playing" && state.CurrentPlayerUserId == _userId, state.CanBuyProperty);
+        var isMyTurn = state.Status == "Playing" && state.CurrentPlayerUserId == _userId;
+        _lblActionHint.Text = state.Status != "Playing"
+            ? "等待玩家准备"
+            : isMyTurn
+                ? state.CanBuyProperty ? "轮到你行动，可购买当前位置地产" : "轮到你行动"
+                : $"等待 {state.CurrentPlayerName} 行动";
+        SetGameButtons(isMyTurn, state.CanBuyProperty);
+    }
+
+    private void RenderPlayerCards(GameStateDto state)
+    {
+        _playerCards.SuspendLayout();
+        _playerCards.Controls.Clear();
+
+        foreach (var player in state.Players.OrderBy(x => x.UserId))
+        {
+            _playerCards.Controls.Add(BuildPlayerCard(player, state));
+        }
+
+        _playerCards.ResumeLayout();
+        ResizePlayerCards();
+    }
+
+    private Control BuildPlayerCard(PlayerStateDto player, GameStateDto state)
+    {
+        var isMe = player.UserId == _userId;
+        var isCurrent = player.UserId == state.CurrentPlayerUserId;
+        var borderColor = player.IsBankrupt
+            ? Color.FromArgb(124, 99, 93)
+            : isCurrent
+                ? Color.FromArgb(212, 151, 38)
+                : isMe
+                    ? Color.FromArgb(33, 116, 84)
+                    : Color.FromArgb(185, 163, 116);
+        var card = new Panel
+        {
+            Height = 92,
+            Width = Math.Max(280, _playerCards.ClientSize.Width - 26),
+            Margin = new Padding(0, 0, 6, 8),
+            Padding = new Padding(8),
+            BackColor = player.IsBankrupt
+                ? Color.FromArgb(224, 215, 205)
+                : isMe
+                    ? Color.FromArgb(224, 243, 228)
+                    : Color.FromArgb(252, 248, 235)
+        };
+        card.Paint += (_, e) =>
+        {
+            using var pen = new Pen(borderColor, isCurrent || isMe ? 2 : 1);
+            e.Graphics.DrawRectangle(pen, 0, 0, card.Width - 1, card.Height - 1);
+        };
+
+        var layout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 3,
+            RowCount = 1,
+            BackColor = Color.Transparent
+        };
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 52));
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 112));
+
+        var token = new PictureBox
+        {
+            Dock = DockStyle.Fill,
+            SizeMode = PictureBoxSizeMode.Zoom,
+            Image = AssetCatalog.GetImage(player.TokenImageFile)
+                ?? AssetCatalog.GetImage(AssetCatalog.TokenOptions[player.UserId % AssetCatalog.TokenOptions.Length].ImageFile),
+            Margin = new Padding(0, 4, 8, 4)
+        };
+        layout.Controls.Add(token, 0, 0);
+
+        var main = new TableLayoutPanel { Dock = DockStyle.Fill, RowCount = 3, BackColor = Color.Transparent };
+        main.RowStyles.Add(new RowStyle(SizeType.Absolute, 27));
+        main.RowStyles.Add(new RowStyle(SizeType.Absolute, 24));
+        main.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        main.Controls.Add(new Label
+        {
+            Text = player.UserName,
+            Dock = DockStyle.Fill,
+            AutoEllipsis = true,
+            TextAlign = ContentAlignment.MiddleLeft,
+            Font = new Font("Microsoft YaHei UI", 10F, FontStyle.Bold),
+            ForeColor = Color.FromArgb(56, 36, 19)
+        }, 0, 0);
+        main.Controls.Add(new Label
+        {
+            Text = $"位置 {player.Position} · {CellNameAt(state, player.Position)}",
+            Dock = DockStyle.Fill,
+            AutoEllipsis = true,
+            TextAlign = ContentAlignment.MiddleLeft,
+            ForeColor = Color.FromArgb(92, 67, 38)
+        }, 0, 1);
+        main.Controls.Add(new Label
+        {
+            Text = $"地产 {player.OwnedProperties} 处 · 免租卡 {player.FreeRentCards} 张",
+            Dock = DockStyle.Fill,
+            AutoEllipsis = true,
+            TextAlign = ContentAlignment.MiddleLeft,
+            ForeColor = Color.FromArgb(92, 67, 38)
+        }, 0, 2);
+        layout.Controls.Add(main, 1, 0);
+
+        var right = new TableLayoutPanel { Dock = DockStyle.Fill, RowCount = 3, BackColor = Color.Transparent };
+        right.RowStyles.Add(new RowStyle(SizeType.Absolute, 38));
+        right.RowStyles.Add(new RowStyle(SizeType.Absolute, 28));
+        right.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        right.Controls.Add(new MoneyBillView
+        {
+            Dock = DockStyle.Fill,
+            Money = player.Money,
+            IsBankrupt = player.IsBankrupt,
+            Margin = new Padding(0, 0, 0, 2)
+        }, 0, 0);
+
+        var badges = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            FlowDirection = FlowDirection.RightToLeft,
+            WrapContents = false,
+            BackColor = Color.Transparent
+        };
+        if (isCurrent)
+        {
+            badges.Controls.Add(Badge("当前", Color.FromArgb(212, 151, 38)));
+        }
+        if (isMe)
+        {
+            badges.Controls.Add(Badge("自己", Color.FromArgb(33, 116, 84)));
+        }
+        if (!player.IsReady && state.Status != "Playing")
+        {
+            badges.Controls.Add(Badge("未准备", Color.FromArgb(133, 91, 58)));
+        }
+        right.Controls.Add(badges, 0, 1);
+        right.Controls.Add(new Label
+        {
+            Text = player.IsReady ? "已准备" : "等待中",
+            Dock = DockStyle.Fill,
+            TextAlign = ContentAlignment.TopRight,
+            ForeColor = Color.FromArgb(92, 67, 38)
+        }, 0, 2);
+        layout.Controls.Add(right, 2, 0);
+
+        card.Controls.Add(layout);
+        return card;
+    }
+
+    private static Label Badge(string text, Color color)
+    {
+        return new Label
+        {
+            Text = text,
+            AutoSize = true,
+            Height = 22,
+            Padding = new Padding(7, 3, 7, 3),
+            Margin = new Padding(4, 2, 0, 2),
+            BackColor = color,
+            ForeColor = Color.White,
+            Font = new Font("Microsoft YaHei UI", 8F, FontStyle.Bold)
+        };
+    }
+
+    private static string CellNameAt(GameStateDto state, int position)
+    {
+        return state.MapCells.FirstOrDefault(x => x.CellIndex == position)?.CellName
+            ?? AssetCatalog.DefaultBoard.FirstOrDefault(x => x.Index == position)?.Name
+            ?? "-";
+    }
+
+    private void ResizePlayerCards()
+    {
+        var width = Math.Max(280, _playerCards.ClientSize.Width - 26);
+        foreach (var card in _playerCards.Controls.OfType<Panel>())
+        {
+            card.Width = width;
+        }
+    }
+
+    private void SendChatFromInput()
+    {
+        var text = _txtChat.Text.Trim();
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return;
+        }
+
+        SendAsync("SendChat", new ChatRequest(text));
+        _txtChat.Clear();
+    }
+
+    private void SendQuickChat(string text)
+    {
+        SendAsync("SendChat", new ChatRequest(text));
+    }
+
+    private void SendReaction(string reactionType)
+    {
+        SendAsync("SendReaction", new ReactionRequest(reactionType));
+    }
+
+    private void AddChatMessage(ChatMessageDto message)
+    {
+        if (_currentRoomId.HasValue && message.RoomId != _currentRoomId.Value)
+        {
+            return;
+        }
+
+        _chatMessages.SuspendLayout();
+        while (_chatMessages.Controls.Count >= 60)
+        {
+            _chatMessages.Controls.RemoveAt(0);
+        }
+
+        var bubble = BuildChatBubble(message);
+        _chatMessages.Controls.Add(bubble);
+        _chatMessages.ResumeLayout();
+        ResizeChatMessages();
+        _chatMessages.ScrollControlIntoView(bubble);
+    }
+
+    private Control BuildChatBubble(ChatMessageDto message)
+    {
+        var isMe = message.SenderUserId == _userId;
+        var panel = new Panel
+        {
+            Height = message.Text.Length > 28 ? 74 : 60,
+            Width = Math.Max(260, _chatMessages.ClientSize.Width - 28),
+            Margin = new Padding(0, 0, 6, 6),
+            Padding = new Padding(7),
+            BackColor = message.MessageType == "Reaction"
+                ? Color.FromArgb(255, 244, 214)
+                : isMe
+                    ? Color.FromArgb(226, 244, 231)
+                    : Color.FromArgb(255, 252, 242)
+        };
+        panel.Paint += (_, e) =>
+        {
+            using var pen = new Pen(isMe ? Color.FromArgb(33, 116, 84) : Color.FromArgb(185, 163, 116), 1);
+            e.Graphics.DrawRectangle(pen, 0, 0, panel.Width - 1, panel.Height - 1);
+        };
+
+        var layout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 2,
+            RowCount = 1,
+            BackColor = Color.Transparent
+        };
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 38));
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+
+        layout.Controls.Add(new PictureBox
+        {
+            Dock = DockStyle.Fill,
+            SizeMode = PictureBoxSizeMode.Zoom,
+            Image = AssetCatalog.GetImage(message.TokenImageFile),
+            Margin = new Padding(0, 2, 7, 2)
+        }, 0, 0);
+
+        var textLayout = new TableLayoutPanel { Dock = DockStyle.Fill, RowCount = 2, BackColor = Color.Transparent };
+        textLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 21));
+        textLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        textLayout.Controls.Add(new Label
+        {
+            Text = $"{message.SenderUserName}  {message.SentAt:HH:mm}",
+            Dock = DockStyle.Fill,
+            AutoEllipsis = true,
+            Font = new Font("Microsoft YaHei UI", 8F, FontStyle.Bold),
+            ForeColor = Color.FromArgb(77, 50, 25)
+        }, 0, 0);
+        textLayout.Controls.Add(new Label
+        {
+            Text = message.MessageType == "Reaction" ? $"互动：{message.Text}" : message.Text,
+            Dock = DockStyle.Fill,
+            AutoEllipsis = true,
+            ForeColor = Color.FromArgb(55, 38, 22)
+        }, 0, 1);
+        layout.Controls.Add(textLayout, 1, 0);
+
+        panel.Controls.Add(layout);
+        return panel;
+    }
+
+    private void ClearChatMessages()
+    {
+        _chatMessages.Controls.Clear();
+    }
+
+    private void ResizeChatMessages()
+    {
+        var width = Math.Max(260, _chatMessages.ClientSize.Width - 28);
+        foreach (var bubble in _chatMessages.Controls.OfType<Panel>())
+        {
+            bubble.Width = width;
+        }
     }
 
     private void ApplyManageData(ManageDataDto data)
@@ -724,6 +1163,15 @@ public class MainForm : Form
         };
         button.FlatAppearance.BorderSize = 0;
         button.Click += (_, _) => click();
+        return button;
+    }
+
+    private static Button SmallButton(string text, Action click)
+    {
+        var button = Button(text, click);
+        button.Height = 28;
+        button.Margin = new Padding(4, 3, 4, 3);
+        button.Font = new Font("Microsoft YaHei UI", 8F, FontStyle.Bold);
         return button;
     }
 
