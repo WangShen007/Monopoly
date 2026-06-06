@@ -114,7 +114,7 @@ public record GameStateDto(
     bool CanBuyProperty);
 
 public record DiceResultDto(int UserId, string UserName, int Dice, int OldPosition, int NewPosition);
-public record MoveResultDto(int UserId, string UserName, int OldPosition, int NewPosition, bool PassedStart, int Money);
+public record MoveResultDto(int UserId, string UserName, int OldPosition, int NewPosition, bool PassedStart, int Money, bool IsBackward = false);
 public record BuyPropertyResultDto(bool Success, string Message, int UserId, int PropertyId);
 public record RentPaidDto(int FromUserId, int ToUserId, int Amount, bool UsedFreeRentCard);
 public record ChanceResultDto(int UserId, string EventName, string EventType, int Value, string Description);
