@@ -431,11 +431,13 @@ public class MainForm : Form
                     SetStatus("轮到你行动", false);
                     break;
                 case "GameStart":
-                case "MoveResult":
                 case "RentPaid":
                 case "ChanceResult":
                 case "TaxResult":
                 case "PlayerBankrupt":
+                    break;
+                case "MoveResult":
+                    ApplyMove(message.ReadData<MoveResultDto>());
                     break;
                 case "GameOver":
                     var over = message.ReadData<GameOverDto>();
@@ -508,6 +510,11 @@ public class MainForm : Form
     {
         _boardView.ShowDice(dice);
         SetStatus($"{dice.UserName} 掷出 {dice.Dice} 点", false);
+    }
+
+    private void ApplyMove(MoveResultDto move)
+    {
+        _boardView.ShowMove(move);
     }
 
     private void ShowBuyResult(NetMessage message)

@@ -5,13 +5,18 @@ namespace MonopolyClient.Visuals;
 public class BoardView : Control
 {
     private const int DiceAnimationDurationMs = 260;
+    private const int TokenMoveStepDurationMs = 120;
 
     private readonly Dictionary<int, string> _playerTokens = [];
     private readonly Random _diceRandom = new();
     private readonly System.Windows.Forms.Timer _diceTimer = new() { Interval = 16 };
+    private readonly System.Windows.Forms.Timer _tokenMoveTimer = new() { Interval = 16 };
+    private readonly Queue<TokenMoveAnimation> _tokenMoveQueue = [];
     private GameStateDto? _state;
     private DiceDisplay? _diceDisplay;
+    private TokenMoveAnimation? _tokenMoveAnimation;
     private DateTime _diceAnimationStartedAtUtc;
+    private DateTime _tokenMoveAnimationStartedAtUtc;
 
     public BoardView()
     {
@@ -19,6 +24,7 @@ public class BoardView : Control
         BackColor = Color.FromArgb(31, 54, 42);
         MinimumSize = new Size(560, 560);
         _diceTimer.Tick += (_, _) => AdvanceDiceAnimation();
+        _tokenMoveTimer.Tick += (_, _) => AdvanceTokenMoveAnimation();
     }
 
     public void SetToken(int userId, string imageFile)
@@ -36,7 +42,10 @@ public class BoardView : Control
         if (state.Status != "Playing")
         {
             _diceTimer.Stop();
+            _tokenMoveTimer.Stop();
+            _tokenMoveQueue.Clear();
             _diceDisplay = null;
+            _tokenMoveAnimation = null;
         }
 
         Invalidate();
@@ -61,11 +70,39 @@ public class BoardView : Control
         Invalidate();
     }
 
+    public void ShowMove(MoveResultDto move)
+    {
+        var mapCellCount = Math.Max(_state?.MapCells.Count ?? 0, AssetCatalog.DefaultBoard.Length);
+        var path = BuildMovePath(move.OldPosition, move.NewPosition, mapCellCount, move.IsBackward);
+        if (path.Count < 2)
+        {
+            return;
+        }
+
+        var animation = new TokenMoveAnimation(
+            move.UserId,
+            move.UserName,
+            ResolvePlayerTokenFile(move.UserId),
+            path);
+
+        if (_tokenMoveAnimation is not null)
+        {
+            _tokenMoveQueue.Enqueue(animation);
+        }
+        else
+        {
+            StartTokenMoveAnimation(animation);
+        }
+
+        Invalidate();
+    }
+
     protected override void Dispose(bool disposing)
     {
         if (disposing)
         {
             _diceTimer.Dispose();
+            _tokenMoveTimer.Dispose();
         }
 
         base.Dispose(disposing);
@@ -89,6 +126,7 @@ public class BoardView : Control
             DrawCells(e.Graphics, board, _state);
         }
 
+        DrawMovingPlayer(e.Graphics, board);
         DrawDiceDisplay(e.Graphics, GetCenterRect(board));
     }
 
@@ -159,11 +197,12 @@ public class BoardView : Control
     private void DrawCells(Graphics graphics, Rectangle board, GameStateDto state)
     {
         var cellsByIndex = state.MapCells.ToDictionary(x => x.CellIndex);
+        var movingUserId = _tokenMoveAnimation?.UserId;
         foreach (var fallback in AssetCatalog.DefaultBoard)
         {
             cellsByIndex.TryGetValue(fallback.Index, out var cell);
             var players = state.Players
-                .Where(x => x.Position == fallback.Index && !x.IsBankrupt)
+                .Where(x => x.Position == fallback.Index && !x.IsBankrupt && x.UserId != movingUserId)
                 .ToList();
             var property = cell is null
                 ? null
@@ -241,10 +280,105 @@ public class BoardView : Control
             return;
         }
 
+        var tokenRects = GetTokenRects(rect, players.Count);
+        for (var i = 0; i < players.Count; i++)
+        {
+            var player = players[i];
+            DrawToken(graphics, tokenRects[i], ResolvePlayerTokenFile(player), false);
+        }
+    }
+
+    private void AdvanceTokenMoveAnimation()
+    {
+        if (_tokenMoveAnimation is null)
+        {
+            StartNextQueuedTokenMoveOrStop();
+            return;
+        }
+
+        var elapsed = (DateTime.UtcNow - _tokenMoveAnimationStartedAtUtc).TotalMilliseconds;
+        var duration = Math.Max(TokenMoveStepDurationMs, (_tokenMoveAnimation.Value.Path.Count - 1) * TokenMoveStepDurationMs);
+        if (elapsed >= duration)
+        {
+            StartNextQueuedTokenMoveOrStop();
+        }
+
+        Invalidate();
+    }
+
+    private void StartTokenMoveAnimation(TokenMoveAnimation animation)
+    {
+        _tokenMoveAnimationStartedAtUtc = DateTime.UtcNow;
+        _tokenMoveAnimation = animation;
+        _tokenMoveTimer.Stop();
+        _tokenMoveTimer.Start();
+    }
+
+    private void StartNextQueuedTokenMoveOrStop()
+    {
+        if (_tokenMoveQueue.Count > 0)
+        {
+            StartTokenMoveAnimation(_tokenMoveQueue.Dequeue());
+            return;
+        }
+
+        _tokenMoveTimer.Stop();
+        _tokenMoveAnimation = null;
+    }
+
+    private void DrawMovingPlayer(Graphics graphics, Rectangle board)
+    {
+        if (_tokenMoveAnimation is null)
+        {
+            return;
+        }
+
+        var animation = _tokenMoveAnimation.Value;
+        var stepCount = animation.Path.Count - 1;
+        if (stepCount <= 0)
+        {
+            return;
+        }
+
+        var elapsed = (DateTime.UtcNow - _tokenMoveAnimationStartedAtUtc).TotalMilliseconds;
+        var stepOffset = Math.Clamp(elapsed / TokenMoveStepDurationMs, 0D, stepCount);
+        var stepIndex = Math.Min(stepCount - 1, (int)Math.Floor(stepOffset));
+        var stepProgress = (float)Math.Clamp(stepOffset - stepIndex, 0D, 1D);
+        var fromRect = GetAnimatedTokenRect(board, animation.Path[stepIndex], animation.UserId);
+        var toRect = GetAnimatedTokenRect(board, animation.Path[stepIndex + 1], animation.UserId);
+        var eased = EaseInOutCubic(stepProgress);
+        var centerX = Lerp(fromRect.Left + fromRect.Width / 2F, toRect.Left + toRect.Width / 2F, eased);
+        var centerY = Lerp(fromRect.Top + fromRect.Height / 2F, toRect.Top + toRect.Height / 2F, eased);
+        var size = Lerp(fromRect.Width, toRect.Width, eased);
+        var bounce = (float)Math.Sin(stepProgress * Math.PI);
+        var liftedCenterY = centerY - Math.Min(10F, size / 4F) * bounce;
+        var scaledSize = size * (1F + 0.08F * bounce);
+        var tokenRect = new RectangleF(
+            centerX - scaledSize / 2F,
+            liftedCenterY - scaledSize / 2F,
+            scaledSize,
+            scaledSize);
+
+        DrawToken(graphics, tokenRect, animation.TokenImageFile, true);
+    }
+
+    private Rectangle GetAnimatedTokenRect(Rectangle board, int cellIndex, int userId)
+    {
+        var rect = GetCellRect(board, cellIndex);
+        var inner = Rectangle.Inflate(rect, -4, -4);
+        var otherPlayers = _state?.Players
+            .Where(x => !x.IsBankrupt && x.UserId != userId && x.Position == cellIndex)
+            .ToList() ?? [];
+        var tokenRects = GetTokenRects(inner, otherPlayers.Count + 1);
+        return tokenRects[Math.Min(otherPlayers.Count, tokenRects.Count - 1)];
+    }
+
+    private static List<Rectangle> GetTokenRects(Rectangle rect, int count)
+    {
         var available = Rectangle.Inflate(rect, -7, -7);
         available.Height = Math.Max(12, available.Height - 29);
-        var columns = available.Width >= 58 && players.Count > 1 ? 2 : 1;
-        var rows = (int)Math.Ceiling(players.Count / (double)columns);
+        var columns = available.Width >= 58 && count > 1 ? 2 : 1;
+        var rows = (int)Math.Ceiling(count / (double)columns);
         const int gap = 3;
         var tokenSize = Math.Min(
             34,
@@ -255,32 +389,96 @@ public class BoardView : Control
                     (available.Height - (rows - 1) * gap) / Math.Max(1, rows))));
         var startX = available.Right - columns * tokenSize - (columns - 1) * gap;
         var startY = available.Top;
+        var tokenRects = new List<Rectangle>(count);
 
-        for (var i = 0; i < players.Count; i++)
+        for (var i = 0; i < count; i++)
         {
-            var player = players[i];
-            var x = startX + (i % columns) * (tokenSize + gap);
-            var y = startY + (i / columns) * (tokenSize + gap);
-            var tokenRect = new Rectangle(x, y, tokenSize, tokenSize);
-            var file = _playerTokens.GetValueOrDefault(player.UserId);
-            if (string.IsNullOrWhiteSpace(file))
-            {
-                file = string.IsNullOrWhiteSpace(player.TokenImageFile)
-                    ? AssetCatalog.TokenOptions[player.UserId % AssetCatalog.TokenOptions.Length].ImageFile
-                    : player.TokenImageFile;
-            }
-
-            var token = AssetCatalog.GetImage(file);
-            if (token is not null)
-            {
-                graphics.DrawImage(token, tokenRect);
-            }
-            else
-            {
-                using var brush = new SolidBrush(Color.FromArgb(221, 64, 47));
-                graphics.FillEllipse(brush, tokenRect);
-            }
+            tokenRects.Add(new Rectangle(
+                startX + (i % columns) * (tokenSize + gap),
+                startY + (i / columns) * (tokenSize + gap),
+                tokenSize,
+                tokenSize));
         }
+
+        return tokenRects;
+    }
+
+    private string ResolvePlayerTokenFile(PlayerStateDto player)
+    {
+        var file = _playerTokens.GetValueOrDefault(player.UserId);
+        if (string.IsNullOrWhiteSpace(file))
+        {
+            file = string.IsNullOrWhiteSpace(player.TokenImageFile)
+                ? AssetCatalog.TokenOptions[player.UserId % AssetCatalog.TokenOptions.Length].ImageFile
+                : player.TokenImageFile;
+        }
+
+        return file;
+    }
+
+    private string ResolvePlayerTokenFile(int userId)
+    {
+        if (_state?.Players.FirstOrDefault(x => x.UserId == userId) is { } player)
+        {
+            return ResolvePlayerTokenFile(player);
+        }
+
+        var file = _playerTokens.GetValueOrDefault(userId);
+        return string.IsNullOrWhiteSpace(file)
+            ? AssetCatalog.TokenOptions[Math.Abs(userId) % AssetCatalog.TokenOptions.Length].ImageFile
+            : file;
+    }
+
+    private static void DrawToken(Graphics graphics, Rectangle rect, string imageFile, bool withShadow)
+    {
+        DrawToken(graphics, new RectangleF(rect.X, rect.Y, rect.Width, rect.Height), imageFile, withShadow);
+    }
+
+    private static void DrawToken(Graphics graphics, RectangleF rect, string imageFile, bool withShadow)
+    {
+        if (withShadow)
+        {
+            using var shadowBrush = new SolidBrush(Color.FromArgb(92, 30, 24, 13));
+            graphics.FillEllipse(shadowBrush, rect.Left + 2, rect.Top + rect.Height - 6, rect.Width - 4, 7);
+        }
+
+        var token = AssetCatalog.GetImage(imageFile);
+        if (token is not null)
+        {
+            graphics.DrawImage(token, rect);
+        }
+        else
+        {
+            using var brush = new SolidBrush(Color.FromArgb(221, 64, 47));
+            graphics.FillEllipse(brush, rect);
+        }
+    }
+
+    private static List<int> BuildMovePath(int oldPosition, int newPosition, int mapCellCount, bool isBackward)
+    {
+        var path = new List<int>();
+        if (mapCellCount <= 0)
+        {
+            return path;
+        }
+
+        var current = NormalizeCellIndex(oldPosition, mapCellCount);
+        var target = NormalizeCellIndex(newPosition, mapCellCount);
+        path.Add(current);
+        for (var guard = 0; guard < mapCellCount && current != target; guard++)
+        {
+            current = isBackward
+                ? (current - 1 + mapCellCount) % mapCellCount
+                : (current + 1) % mapCellCount;
+            path.Add(current);
+        }
+
+        return path;
+    }
+
+    private static int NormalizeCellIndex(int index, int mapCellCount)
+    {
+        return ((index % mapCellCount) + mapCellCount) % mapCellCount;
     }
 
     private void AdvanceDiceAnimation()
@@ -439,6 +637,18 @@ public class BoardView : Control
         return 1F - inverse * inverse * inverse;
     }
 
+    private static float EaseInOutCubic(float value)
+    {
+        return value < 0.5F
+            ? 4F * value * value * value
+            : 1F - MathF.Pow(-2F * value + 2F, 3F) / 2F;
+    }
+
+    private static float Lerp(float from, float to, float progress)
+    {
+        return from + (to - from) * progress;
+    }
+
     private static Color FallbackCellColor(string type)
     {
         return type switch
@@ -464,6 +674,8 @@ public class BoardView : Control
 }
 
 internal readonly record struct DiceDisplay(int UserId, string UserName, int FinalValue, int DisplayValue, float Progress);
+
+internal readonly record struct TokenMoveAnimation(int UserId, string UserName, string TokenImageFile, IReadOnlyList<int> Path);
 
 internal readonly record struct BoardGeometry(Rectangle Board, int RingThickness)
 {
