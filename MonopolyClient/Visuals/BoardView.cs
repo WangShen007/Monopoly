@@ -60,31 +60,24 @@ public class BoardView : Control
 
     private static Rectangle GetCellRect(Rectangle board, int index)
     {
-        const int grid = 8;
-        var tile = board.Width / grid;
-        var used = tile * grid;
-        var left = board.Left + (board.Width - used) / 2;
-        var top = board.Top + (board.Height - used) / 2;
-
-        var (col, row) = index switch
+        var geometry = BoardGeometry.From(board);
+        return index switch
         {
-            >= 0 and <= 7 => (index, 7),
-            >= 8 and <= 14 => (7, 7 - (index - 7)),
-            >= 15 and <= 21 => (7 - (index - 14), 0),
-            _ => (0, index - 21)
+            0 => geometry.BottomLeftCorner,
+            >= 1 and <= 6 => geometry.HorizontalSegment(index - 1, true),
+            7 => geometry.BottomRightCorner,
+            >= 8 and <= 13 => geometry.VerticalSegment(13 - index, true),
+            14 => geometry.TopRightCorner,
+            >= 15 and <= 20 => geometry.HorizontalSegment(20 - index, false),
+            21 => geometry.TopLeftCorner,
+            >= 22 and <= 27 => geometry.VerticalSegment(index - 22, false),
+            _ => Rectangle.Empty
         };
-
-        return new Rectangle(left + col * tile, top + row * tile, tile, tile);
     }
 
     private static Rectangle GetCenterRect(Rectangle board)
     {
-        const int grid = 8;
-        var tile = board.Width / grid;
-        var used = tile * grid;
-        var left = board.Left + (board.Width - used) / 2;
-        var top = board.Top + (board.Height - used) / 2;
-        return new Rectangle(left + tile, top + tile, tile * 6, tile * 6);
+        return BoardGeometry.From(board).Center;
     }
 
     private static void DrawBoardBackground(Graphics graphics, Rectangle board)
@@ -203,12 +196,26 @@ public class BoardView : Control
             return;
         }
 
-        var tokenSize = Math.Max(24, rect.Width / 4);
+        var available = Rectangle.Inflate(rect, -7, -7);
+        available.Height = Math.Max(12, available.Height - 29);
+        var columns = available.Width >= 58 && players.Count > 1 ? 2 : 1;
+        var rows = (int)Math.Ceiling(players.Count / (double)columns);
+        const int gap = 3;
+        var tokenSize = Math.Min(
+            34,
+            Math.Max(
+                14,
+                Math.Min(
+                    (available.Width - (columns - 1) * gap) / columns,
+                    (available.Height - (rows - 1) * gap) / Math.Max(1, rows))));
+        var startX = available.Right - columns * tokenSize - (columns - 1) * gap;
+        var startY = available.Top;
+
         for (var i = 0; i < players.Count; i++)
         {
             var player = players[i];
-            var x = rect.Right - tokenSize - 8 - (i % 2) * (tokenSize + 3);
-            var y = rect.Top + 8 + (i / 2) * (tokenSize + 3);
+            var x = startX + (i % columns) * (tokenSize + gap);
+            var y = startY + (i / columns) * (tokenSize + gap);
             var tokenRect = new Rectangle(x, y, tokenSize, tokenSize);
             var file = _playerTokens.GetValueOrDefault(player.UserId);
             if (string.IsNullOrWhiteSpace(file))
@@ -252,6 +259,47 @@ public class BoardView : Control
             Trimming = StringTrimming.EllipsisCharacter,
             FormatFlags = StringFormatFlags.NoWrap
         };
+    }
+}
+
+internal readonly record struct BoardGeometry(Rectangle Board, int RingThickness)
+{
+    private const int MiddleSegments = 6;
+
+    public Rectangle Center => Rectangle.FromLTRB(
+        Board.Left + RingThickness,
+        Board.Top + RingThickness,
+        Board.Right - RingThickness,
+        Board.Bottom - RingThickness);
+
+    public Rectangle TopLeftCorner => new(Board.Left, Board.Top, RingThickness, RingThickness);
+    public Rectangle TopRightCorner => new(Board.Right - RingThickness, Board.Top, RingThickness, RingThickness);
+    public Rectangle BottomLeftCorner => new(Board.Left, Board.Bottom - RingThickness, RingThickness, RingThickness);
+    public Rectangle BottomRightCorner => new(Board.Right - RingThickness, Board.Bottom - RingThickness, RingThickness, RingThickness);
+
+    public static BoardGeometry From(Rectangle board)
+    {
+        var ring = Math.Clamp((int)Math.Round(board.Width * 0.20), 58, board.Width / 4);
+        return new BoardGeometry(board, ring);
+    }
+
+    public Rectangle HorizontalSegment(int segmentIndex, bool bottom)
+    {
+        var segment = MiddleSegment(Board.Left + RingThickness, Board.Width - RingThickness * 2, segmentIndex);
+        return new Rectangle(segment.Start, bottom ? Board.Bottom - RingThickness : Board.Top, segment.Length, RingThickness);
+    }
+
+    public Rectangle VerticalSegment(int segmentIndex, bool right)
+    {
+        var segment = MiddleSegment(Board.Top + RingThickness, Board.Height - RingThickness * 2, segmentIndex);
+        return new Rectangle(right ? Board.Right - RingThickness : Board.Left, segment.Start, RingThickness, segment.Length);
+    }
+
+    private static (int Start, int Length) MiddleSegment(int start, int totalLength, int index)
+    {
+        var segmentStart = start + totalLength * index / MiddleSegments;
+        var segmentEnd = start + totalLength * (index + 1) / MiddleSegments;
+        return (segmentStart, segmentEnd - segmentStart);
     }
 }
 
