@@ -68,6 +68,26 @@ public class GameRulesTests
     }
 
     [Fact]
+    public void NetMessage_RoundTripsChatPayload()
+    {
+        var sentAt = DateTime.Now;
+        var source = NetMessage.Create(
+            "ChatMessage",
+            new ChatMessageDto(7, 21, "alice", "棋子-1.png", "Text", "我等到花儿也谢了", sentAt));
+        var json = JsonSerializer.Serialize(source, JsonProtocol.Options);
+        var restored = JsonSerializer.Deserialize<NetMessage>(json, JsonProtocol.Options)!;
+
+        var payload = restored.ReadData<ChatMessageDto>();
+
+        Assert.Equal("ChatMessage", restored.Type);
+        Assert.Equal(7, payload.RoomId);
+        Assert.Equal(21, payload.SenderUserId);
+        Assert.Equal("alice", payload.SenderUserName);
+        Assert.Equal("Text", payload.MessageType);
+        Assert.Equal("我等到花儿也谢了", payload.Text);
+    }
+
+    [Fact]
     public void Bootstrapper_CreatesSeededDatabase()
     {
         var tempDir = Path.Combine(Path.GetTempPath(), $"monopoly-test-{Guid.NewGuid():N}");
