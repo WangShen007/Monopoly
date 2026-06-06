@@ -91,7 +91,7 @@ public record PlayerStateDto(
     bool IsReady,
     int OwnedProperties,
     int FreeRentCards,
-    string TokenImageFile = "棋子-1.png");
+    string TokenImageFile = "棋子-红.png");
 
 public record PropertyStateDto(
     int PropertyId,

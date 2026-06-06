@@ -303,19 +303,19 @@ public class GameTcpServer
     {
         var allowed = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
-            "棋子-1.png",
-            "棋子-2.png",
-            "文旅盲盒.png",
-            "钱.png"
+            "棋子-红.png",
+            "棋子-黄.png",
+            "棋子-蓝.png",
+            "棋子-绿.png"
         };
 
         if (string.IsNullOrWhiteSpace(tokenImageFile))
         {
-            return "棋子-1.png";
+            return "棋子-红.png";
         }
 
         var fileName = Path.GetFileName(tokenImageFile.Trim());
-        return allowed.Contains(fileName) ? fileName : "棋子-1.png";
+        return allowed.Contains(fileName) ? fileName : "棋子-红.png";
     }
 
     private async Task CreateRoomAsync(ClientUser user, CreateRoomRequest request)

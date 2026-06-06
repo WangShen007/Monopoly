@@ -73,7 +73,7 @@ public class GameRulesTests
         var sentAt = DateTime.Now;
         var source = NetMessage.Create(
             "ChatMessage",
-            new ChatMessageDto(7, 21, "alice", "棋子-1.png", "Text", "我等到花儿也谢了", sentAt));
+            new ChatMessageDto(7, 21, "alice", "棋子-红.png", "Text", "我等到花儿也谢了", sentAt));
         var json = JsonSerializer.Serialize(source, JsonProtocol.Options);
         var restored = JsonSerializer.Deserialize<NetMessage>(json, JsonProtocol.Options)!;
 
