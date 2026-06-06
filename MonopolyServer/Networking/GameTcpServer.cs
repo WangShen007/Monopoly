@@ -116,6 +116,12 @@ public class GameTcpServer
                 case "EndTurn":
                     await UpdateRoomAndBroadcastAsync(_roomService.EndTurn(user));
                     break;
+                case "SendChat":
+                    await SendChatAsync(user, message.ReadData<ChatRequest>());
+                    break;
+                case "SendReaction":
+                    await SendReactionAsync(user, message.ReadData<ReactionRequest>());
+                    break;
                 case "GetManageData":
                     RequireLoggedIn(user);
                     await user.SendAsync(NetMessage.Create("ManageDataResult", GetManageData()));
@@ -226,6 +232,71 @@ public class GameTcpServer
         user.TokenImageFile = NormalizeTokenImageFile(request.TokenImageFile);
         await user.SendAsync(NetMessage.Create("LoginResult", new LoginResult(true, "登录成功", user.UserId, user.UserName)));
         await user.SendAsync(NetMessage.Create("RoomListResult", new RoomListResult(_roomService.GetRoomSummaries())));
+    }
+
+    private async Task SendChatAsync(ClientUser user, ChatRequest request)
+    {
+        var text = NormalizeChatText(request.Text);
+        var message = BuildChatMessage(user, "Text", text);
+        await BroadcastToRoomAsync(user, NetMessage.Create("ChatMessage", message));
+    }
+
+    private async Task SendReactionAsync(ClientUser user, ReactionRequest request)
+    {
+        var reaction = (request.ReactionType ?? string.Empty).Trim();
+        var text = reaction switch
+        {
+            "Egg" => "扔出一个鸡蛋",
+            "Flower" => "送出一朵小花",
+            "Cheer" => "发来一声喝彩",
+            _ => throw new InvalidOperationException("未知互动道具")
+        };
+        var message = BuildChatMessage(user, "Reaction", text);
+        await BroadcastToRoomAsync(user, NetMessage.Create("ChatMessage", message));
+    }
+
+    private ChatMessageDto BuildChatMessage(ClientUser user, string messageType, string text)
+    {
+        RequireLoggedIn(user);
+        if (!user.RoomId.HasValue)
+        {
+            throw new InvalidOperationException("请先进入房间");
+        }
+
+        return new ChatMessageDto(
+            user.RoomId.Value,
+            user.UserId,
+            user.UserName,
+            user.TokenImageFile,
+            messageType,
+            text,
+            DateTime.Now);
+    }
+
+    private async Task BroadcastToRoomAsync(ClientUser user, NetMessage message)
+    {
+        if (!user.RoomId.HasValue)
+        {
+            throw new InvalidOperationException("请先进入房间");
+        }
+
+        var room = _roomService.GetRoom(user.RoomId.Value)
+            ?? throw new InvalidOperationException("房间不存在");
+        foreach (var client in room.Players.ToList())
+        {
+            await client.SendAsync(message);
+        }
+    }
+
+    private static string NormalizeChatText(string? text)
+    {
+        var normalized = (text ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            throw new InvalidOperationException("聊天内容不能为空");
+        }
+
+        return normalized.Length <= 80 ? normalized : normalized[..80];
     }
 
     private static string NormalizeTokenImageFile(string? tokenImageFile)

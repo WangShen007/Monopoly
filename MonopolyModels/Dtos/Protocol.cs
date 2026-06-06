@@ -40,6 +40,8 @@ public record LoginResult(bool Success, string Message, int UserId, string UserN
 public record CreateRoomRequest(string RoomName, int MaxPlayers);
 public record JoinRoomRequest(int RoomId);
 public record EntityIdRequest(int Id);
+public record ChatRequest(string Text);
+public record ReactionRequest(string ReactionType);
 
 public record RoomSummaryDto(
     int RoomId,
@@ -121,6 +123,14 @@ public record ChanceResultDto(int UserId, string EventName, string EventType, in
 public record TaxResultDto(int UserId, int Amount);
 public record PlayerBankruptDto(int UserId, string UserName);
 public record GameOverDto(int WinnerUserId, string WinnerUserName, string EndReason, List<PlayerStateDto> Ranking);
+public record ChatMessageDto(
+    int RoomId,
+    int SenderUserId,
+    string SenderUserName,
+    string TokenImageFile,
+    string MessageType,
+    string Text,
+    DateTime SentAt);
 
 public record ManageDataDto(
     List<MapCellDto> MapCells,
