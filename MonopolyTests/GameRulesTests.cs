@@ -1,3 +1,5 @@
+using System.Net;
+using System.Net.Sockets;
 using System.Text.Json;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
@@ -76,10 +78,44 @@ public class GameRulesTests
 
             using var db = new MonopolyDbContext(dbPath);
 
-            Assert.Equal(20, db.MapCells.Count());
-            Assert.True(db.Properties.Count() >= 8);
+            Assert.Equal(28, db.MapCells.Count());
+            Assert.Equal(17, db.Properties.Count());
             Assert.True(db.EventCards.Count(x => x.IsEnabled) >= 5);
             Assert.Equal("Start", db.MapCells.Single(x => x.CellIndex == 0).CellType);
+            Assert.Equal("郑州", db.MapCells.Single(x => x.CellIndex == 1).CellName);
+        }
+        finally
+        {
+            DeleteDirectoryWithRetry(tempDir);
+        }
+    }
+
+    [Fact]
+    public void Bootstrapper_DoesNotOverwriteExistingMapData()
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), $"monopoly-existing-{Guid.NewGuid():N}");
+        var dbPath = Path.Combine(tempDir, "test.db");
+        try
+        {
+            using (var db = new MonopolyDbContext(dbPath))
+            {
+                db.Database.EnsureCreated();
+                db.MapCells.Add(new MapCell
+                {
+                    CellIndex = 0,
+                    CellName = "自定义起点",
+                    CellType = "Start",
+                    Description = "保留后台维护的数据"
+                });
+                db.SaveChanges();
+            }
+
+            DatabaseBootstrapper.EnsureCreatedAndSeeded(dbPath);
+
+            using var verify = new MonopolyDbContext(dbPath);
+            Assert.Single(verify.MapCells);
+            Assert.Equal("自定义起点", verify.MapCells.Single().CellName);
+            Assert.True(verify.EventCards.Count(x => x.IsEnabled) >= 5);
         }
         finally
         {
@@ -130,6 +166,57 @@ public class GameRulesTests
         {
             DeleteDirectoryWithRetry(tempDir);
         }
+    }
+
+    [Fact]
+    public async Task RoomService_PreventsSameUserFromEnteringMultipleRooms()
+    {
+        var dbPath = Path.Combine(Path.GetTempPath(), $"monopoly-room-{Guid.NewGuid():N}.db");
+        var firstPair = await CreateTcpPairAsync();
+        var secondPair = await CreateTcpPairAsync();
+        try
+        {
+            var service = new RoomService(dbPath, new RecordService(dbPath));
+            var firstUser = new ClientUser(firstPair.ServerSide)
+            {
+                UserId = 1001,
+                UserName = "first"
+            };
+            var secondUser = new ClientUser(secondPair.ServerSide)
+            {
+                UserId = 1002,
+                UserName = "second"
+            };
+
+            service.CreateRoom(firstUser, "one", 2);
+            var secondRoom = service.CreateRoom(secondUser, "two", 2);
+
+            Assert.Throws<InvalidOperationException>(() => service.CreateRoom(firstUser, "again", 2));
+            Assert.Throws<InvalidOperationException>(() => service.JoinRoom(firstUser, secondRoom.RoomId));
+        }
+        finally
+        {
+            firstPair.Client.Dispose();
+            firstPair.ServerSide.Dispose();
+            secondPair.Client.Dispose();
+            secondPair.ServerSide.Dispose();
+            if (File.Exists(dbPath))
+            {
+                File.Delete(dbPath);
+            }
+        }
+    }
+
+    private static async Task<(TcpClient Client, TcpClient ServerSide)> CreateTcpPairAsync()
+    {
+        using var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        var endpoint = (IPEndPoint)listener.LocalEndpoint;
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        var acceptTask = listener.AcceptTcpClientAsync(cts.Token);
+        var client = new TcpClient();
+        await client.ConnectAsync(endpoint.Address, endpoint.Port, cts.Token);
+        return (client, await acceptTask);
     }
 
     private static void DeleteDirectoryWithRetry(string path)

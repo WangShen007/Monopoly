@@ -22,6 +22,7 @@ public class ClientUser
     public StreamWriter Writer { get; }
     public int UserId { get; set; }
     public string UserName { get; set; } = string.Empty;
+    public string TokenImageFile { get; set; } = "棋子-1.png";
     public int? RoomId { get; set; }
     public bool IsLoggedIn => UserId > 0;
 

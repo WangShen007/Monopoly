@@ -46,6 +46,11 @@ public class RoomService
             throw new InvalidOperationException("请先登录");
         }
 
+        if (owner.RoomId.HasValue)
+        {
+            throw new InvalidOperationException("请先离开当前房间");
+        }
+
         lock (_gate)
         {
             var room = new GameRoom
@@ -73,6 +78,11 @@ public class RoomService
             var room = _rooms.GetValueOrDefault(roomId) ?? throw new InvalidOperationException("房间不存在");
             lock (room.Gate)
             {
+                if (user.RoomId.HasValue && user.RoomId.Value != roomId)
+                {
+                    throw new InvalidOperationException("请先离开当前房间");
+                }
+
                 if (room.Status != "Waiting")
                 {
                     throw new InvalidOperationException("房间已经开始游戏");
@@ -298,7 +308,8 @@ public class RoomService
                     x.IsBankrupt,
                     x.IsReady,
                     room.PropertyStates.Count(p => p.OwnerUserId == x.UserId),
-                    x.FreeRentCards)).ToList(),
+                    x.FreeRentCards,
+                    x.TokenImageFile)).ToList(),
                 room.Logs.TakeLast(80).ToList(),
                 canBuy);
         }
@@ -547,7 +558,8 @@ public class RoomService
             UserId = user.UserId,
             UserName = user.UserName,
             Position = 0,
-            Money = GameRules.InitialMoney
+            Money = GameRules.InitialMoney,
+            TokenImageFile = user.TokenImageFile
         });
     }
 

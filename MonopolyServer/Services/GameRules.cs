@@ -9,7 +9,7 @@ public static class GameRules
     public const int StartReward = 200;
     public const int TaxAmount = 150;
     public const int MaxRounds = 60;
-    public const int MapCellCount = 20;
+    public const int MapCellCount = 28;
 
     public static (int NewPosition, bool PassedStart) Move(PlayerState player, int steps, int mapCellCount = MapCellCount)
     {

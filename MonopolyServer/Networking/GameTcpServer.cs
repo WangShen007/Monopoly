@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Sockets;
+using System.Security.Cryptography;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using MonopolyModels.Data;
@@ -11,6 +12,10 @@ namespace MonopolyServer.Networking;
 
 public class GameTcpServer
 {
+    private const string PasswordHashPrefix = "pbkdf2-sha256$";
+    private const int PasswordHashIterations = 100_000;
+    private const int PasswordHashSize = 32;
+
     private readonly string _databasePath;
     private readonly RecordService _recordService;
     private readonly RoomService _roomService;
@@ -112,6 +117,7 @@ public class GameTcpServer
                     await UpdateRoomAndBroadcastAsync(_roomService.EndTurn(user));
                     break;
                 case "GetManageData":
+                    RequireLoggedIn(user);
                     await user.SendAsync(NetMessage.Create("ManageDataResult", GetManageData()));
                     break;
                 case "AddMapCell":
@@ -176,7 +182,7 @@ public class GameTcpServer
         db.Users.Add(new User
         {
             UserName = name,
-            Password = request.Password,
+            Password = HashPassword(request.Password),
             CreatedAt = DateTime.Now
         });
         await db.SaveChangesAsync();
@@ -198,22 +204,47 @@ public class GameTcpServer
             entity = new User
             {
                 UserName = name,
-                Password = request.Password,
+                Password = HashPassword(request.Password),
                 CreatedAt = DateTime.Now
             };
             db.Users.Add(entity);
             await db.SaveChangesAsync();
         }
-        else if (entity.Password != request.Password)
+        else if (!VerifyPassword(entity.Password, request.Password))
         {
             await user.SendAsync(NetMessage.Create("LoginResult", new LoginResult(false, "密码错误", 0, string.Empty)));
             return;
         }
+        else if (!IsHashedPassword(entity.Password))
+        {
+            entity.Password = HashPassword(request.Password);
+            await db.SaveChangesAsync();
+        }
 
         user.UserId = entity.Id;
         user.UserName = entity.UserName;
+        user.TokenImageFile = NormalizeTokenImageFile(request.TokenImageFile);
         await user.SendAsync(NetMessage.Create("LoginResult", new LoginResult(true, "登录成功", user.UserId, user.UserName)));
         await user.SendAsync(NetMessage.Create("RoomListResult", new RoomListResult(_roomService.GetRoomSummaries())));
+    }
+
+    private static string NormalizeTokenImageFile(string? tokenImageFile)
+    {
+        var allowed = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "棋子-1.png",
+            "棋子-2.png",
+            "文旅盲盒.png",
+            "钱.png"
+        };
+
+        if (string.IsNullOrWhiteSpace(tokenImageFile))
+        {
+            return "棋子-1.png";
+        }
+
+        var fileName = Path.GetFileName(tokenImageFile.Trim());
+        return allowed.Contains(fileName) ? fileName : "棋子-1.png";
     }
 
     private async Task CreateRoomAsync(ClientUser user, CreateRoomRequest request)
@@ -357,6 +388,7 @@ public class GameTcpServer
 
     private async Task SaveMapCellAsync(ClientUser user, MapCellEditDto dto, bool update)
     {
+        RequireLoggedIn(user);
         using var db = new MonopolyDbContext(_databasePath);
         MapCell entity;
         if (update)
@@ -379,6 +411,7 @@ public class GameTcpServer
 
     private async Task DeleteMapCellAsync(ClientUser user, int id)
     {
+        RequireLoggedIn(user);
         using var db = new MonopolyDbContext(_databasePath);
         var entity = await db.MapCells.FindAsync(id) ?? throw new InvalidOperationException("地图格子不存在");
         db.MapCells.Remove(entity);
@@ -388,6 +421,7 @@ public class GameTcpServer
 
     private async Task SavePropertyAsync(ClientUser user, PropertyEditDto dto, bool update)
     {
+        RequireLoggedIn(user);
         using var db = new MonopolyDbContext(_databasePath);
         Property entity;
         if (update)
@@ -411,6 +445,7 @@ public class GameTcpServer
 
     private async Task DeletePropertyAsync(ClientUser user, int id)
     {
+        RequireLoggedIn(user);
         using var db = new MonopolyDbContext(_databasePath);
         var entity = await db.Properties.FindAsync(id) ?? throw new InvalidOperationException("地产不存在");
         db.Properties.Remove(entity);
@@ -420,6 +455,7 @@ public class GameTcpServer
 
     private async Task SaveEventCardAsync(ClientUser user, EventCardEditDto dto, bool update)
     {
+        RequireLoggedIn(user);
         using var db = new MonopolyDbContext(_databasePath);
         EventCard entity;
         if (update)
@@ -443,6 +479,7 @@ public class GameTcpServer
 
     private async Task DeleteEventCardAsync(ClientUser user, int id)
     {
+        RequireLoggedIn(user);
         using var db = new MonopolyDbContext(_databasePath);
         var entity = await db.EventCards.FindAsync(id) ?? throw new InvalidOperationException("事件卡不存在");
         db.EventCards.Remove(entity);
@@ -453,5 +490,65 @@ public class GameTcpServer
     private static Task SendErrorAsync(ClientUser user, string message)
     {
         return user.SendAsync(NetMessage.Create("Error", new BasicResult(false, message)));
+    }
+
+    private static void RequireLoggedIn(ClientUser user)
+    {
+        if (!user.IsLoggedIn)
+        {
+            throw new InvalidOperationException("请先登录");
+        }
+    }
+
+    private static string HashPassword(string password)
+    {
+        var salt = RandomNumberGenerator.GetBytes(16);
+        var hash = Rfc2898DeriveBytes.Pbkdf2(
+            password,
+            salt,
+            PasswordHashIterations,
+            HashAlgorithmName.SHA256,
+            PasswordHashSize);
+
+        return $"{PasswordHashPrefix}{PasswordHashIterations}${Convert.ToBase64String(salt)}${Convert.ToBase64String(hash)}";
+    }
+
+    private static bool VerifyPassword(string storedPassword, string password)
+    {
+        if (!IsHashedPassword(storedPassword))
+        {
+            return storedPassword == password;
+        }
+
+        var parts = storedPassword.Split('$');
+        if (parts.Length != 4
+            || !int.TryParse(parts[1], out var iterations)
+            || iterations <= 0)
+        {
+            return false;
+        }
+
+        try
+        {
+            var salt = Convert.FromBase64String(parts[2]);
+            var expected = Convert.FromBase64String(parts[3]);
+            var actual = Rfc2898DeriveBytes.Pbkdf2(
+                password,
+                salt,
+                iterations,
+                HashAlgorithmName.SHA256,
+                expected.Length);
+
+            return CryptographicOperations.FixedTimeEquals(actual, expected);
+        }
+        catch (FormatException)
+        {
+            return false;
+        }
+    }
+
+    private static bool IsHashedPassword(string password)
+    {
+        return password.StartsWith(PasswordHashPrefix, StringComparison.Ordinal);
     }
 }

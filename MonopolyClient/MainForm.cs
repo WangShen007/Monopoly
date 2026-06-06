@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using MonopolyClient.Networking;
+using MonopolyClient.Visuals;
 using MonopolyModels.Dtos;
 
 namespace MonopolyClient;
@@ -7,23 +8,30 @@ namespace MonopolyClient;
 public class MainForm : Form
 {
     private readonly GameTcpClient _client = new();
-    private readonly TextBox _txtIp = new() { Text = "127.0.0.1", Width = 110 };
-    private readonly NumericUpDown _numPort = new() { Minimum = 1, Maximum = 65535, Value = 9000, Width = 80 };
-    private readonly TextBox _txtUser = new() { Text = "player1", Width = 120 };
-    private readonly TextBox _txtPassword = new() { Text = "123456", Width = 120, UseSystemPasswordChar = true };
+    private readonly Panel _loginPage = new() { Dock = DockStyle.Fill };
+    private readonly Panel _mainShell = new() { Dock = DockStyle.Fill, Visible = false };
+    private readonly Panel _loginCard = new();
+    private readonly TextBox _txtIp = new() { Text = "127.0.0.1", Width = 190 };
+    private readonly NumericUpDown _numPort = new() { Minimum = 1, Maximum = 65535, Value = 9000, Width = 95 };
+    private readonly TextBox _txtUser = new() { Text = "player1", Width = 260 };
+    private readonly TextBox _txtPassword = new() { Text = "123456", Width = 260, UseSystemPasswordChar = true };
+    private readonly ComboBox _tokenCombo = new() { Width = 260, DropDownStyle = ComboBoxStyle.DropDownList };
+    private readonly Label _lblLoginStatus = new() { AutoSize = false, Height = 28, Text = "请先连接服务器", TextAlign = ContentAlignment.MiddleCenter };
     private readonly Label _lblStatus = new() { AutoSize = true, Text = "未连接" };
+    private readonly Label _lblUser = new() { AutoSize = true, Text = "未登录" };
+    private readonly Label _lblToken = new() { AutoSize = true, Text = "棋子：-" };
     private readonly DataGridView _roomGrid = Grid();
-    private readonly TextBox _txtRoomName = new() { Text = "课程设计房间", Width = 180 };
+    private readonly TextBox _txtRoomName = new() { Text = "河南文旅房间", Width = 180 };
     private readonly NumericUpDown _numMaxPlayers = new() { Minimum = 2, Maximum = 4, Value = 2, Width = 60 };
-    private readonly Button[] _cellButtons = new Button[20];
+    private readonly BoardView _boardView = new() { Dock = DockStyle.Fill };
     private readonly DataGridView _playerGrid = Grid();
     private readonly DataGridView _propertyGrid = Grid();
     private readonly ListBox _logList = new() { Dock = DockStyle.Fill, IntegralHeight = false };
     private readonly Label _lblTurn = new() { AutoSize = true, Text = "当前回合：-" };
-    private readonly Label _lblUser = new() { AutoSize = true, Text = "未登录" };
-    private readonly Button _btnRoll = new() { Text = "掷骰子", Width = 90 };
-    private readonly Button _btnBuy = new() { Text = "购买地产", Width = 90 };
-    private readonly Button _btnEnd = new() { Text = "结束回合", Width = 90 };
+    private readonly PictureBox _dicePicture = new() { Width = 58, Height = 58, SizeMode = PictureBoxSizeMode.Zoom };
+    private readonly Button _btnRoll = new() { Text = "掷骰子", Width = 92, Height = 34 };
+    private readonly Button _btnBuy = new() { Text = "购买地产", Width = 92, Height = 34 };
+    private readonly Button _btnEnd = new() { Text = "结束回合", Width = 92, Height = 34 };
     private readonly DataGridView _mapGrid = Grid(true);
     private readonly DataGridView _managePropertyGrid = Grid(true);
     private readonly DataGridView _eventGrid = Grid(true);
@@ -40,14 +48,26 @@ public class MainForm : Form
 
     public MainForm()
     {
-        Text = "多人回合制地产经营游戏系统";
-        MinimumSize = new Size(1180, 760);
+        Text = "河南文旅大富翁";
+        MinimumSize = new Size(1240, 820);
         StartPosition = FormStartPosition.CenterScreen;
         Font = new Font("Microsoft YaHei UI", 9F);
-        BackColor = Color.FromArgb(244, 246, 248);
+        BackColor = Color.FromArgb(31, 54, 42);
 
-        _client.MessageReceived += message => BeginInvoke(() => HandleMessage(message));
-        _client.Disconnected += reason => BeginInvoke(() => SetStatus($"连接断开：{reason}", true));
+        _client.MessageReceived += message =>
+        {
+            if (!IsDisposed)
+            {
+                BeginInvoke(() => HandleMessage(message));
+            }
+        };
+        _client.Disconnected += reason =>
+        {
+            if (!IsDisposed)
+            {
+                BeginInvoke(() => SetStatus($"连接断开：{reason}", true));
+            }
+        };
 
         BuildUi();
         WireEvents();
@@ -66,23 +86,150 @@ public class MainForm : Form
 
     private void BuildUi()
     {
+        _tokenCombo.DataSource = AssetCatalog.TokenOptions.ToList();
+        _tokenCombo.DisplayMember = nameof(TokenOption.DisplayName);
+
+        Controls.Add(_mainShell);
+        Controls.Add(_loginPage);
+        BuildLoginPage();
+        BuildMainShell();
+        _loginPage.BringToFront();
+    }
+
+    private void BuildLoginPage()
+    {
+        _loginPage.BackColor = Color.FromArgb(36, 45, 33);
+        _loginPage.BackgroundImage = AssetCatalog.GetImage("登录界面.png");
+        _loginPage.BackgroundImageLayout = ImageLayout.Stretch;
+        _loginPage.Resize += (_, _) => CenterLoginCard();
+
+        _loginCard.Size = new Size(520, 430);
+        _loginCard.BackColor = Color.FromArgb(242, 219, 165);
+        _loginCard.Padding = new Padding(26, 24, 26, 20);
+        _loginCard.Paint += (_, e) =>
+        {
+            using var border = new Pen(Color.FromArgb(146, 95, 41), 2);
+            e.Graphics.DrawRectangle(border, 1, 1, _loginCard.Width - 3, _loginCard.Height - 3);
+        };
+
+        var layout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 2,
+            RowCount = 8,
+            BackColor = Color.Transparent
+        };
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 116));
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 56));
+        for (var i = 1; i < 7; i++)
+        {
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 43));
+        }
+        layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+
+        var title = new Label
+        {
+            Text = "玩家通行证",
+            Dock = DockStyle.Fill,
+            TextAlign = ContentAlignment.MiddleCenter,
+            Font = new Font("Microsoft YaHei UI", 18F, FontStyle.Bold),
+            ForeColor = Color.FromArgb(91, 45, 19)
+        };
+        layout.Controls.Add(title, 0, 0);
+        layout.SetColumnSpan(title, 2);
+
+        AddFormRow(layout, 1, "服务器", BuildServerRow());
+        AddFormRow(layout, 2, "玩家名 / ID", _txtUser);
+        AddFormRow(layout, 3, "通行码", _txtPassword);
+        AddFormRow(layout, 4, "棋子", _tokenCombo);
+        AddFormRow(layout, 5, "房间名", _txtRoomName);
+        AddFormRow(layout, 6, "人数", _numMaxPlayers);
+
+        var buttons = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            FlowDirection = FlowDirection.LeftToRight,
+            WrapContents = false,
+            Padding = new Padding(0, 10, 0, 0)
+        };
+        buttons.Controls.AddRange([
+            Button("连接", ConnectAsync),
+            Button("注册", RegisterAsync),
+            Button("登录进入大厅", LoginAsync)
+        ]);
+
+        var bottom = new TableLayoutPanel { Dock = DockStyle.Fill, RowCount = 2 };
+        bottom.RowStyles.Add(new RowStyle(SizeType.Absolute, 48));
+        bottom.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        bottom.Controls.Add(buttons, 0, 0);
+        bottom.Controls.Add(_lblLoginStatus, 0, 1);
+        layout.Controls.Add(bottom, 0, 7);
+        layout.SetColumnSpan(bottom, 2);
+
+        _loginCard.Controls.Add(layout);
+        _loginPage.Controls.Add(_loginCard);
+        CenterLoginCard();
+    }
+
+    private Control BuildServerRow()
+    {
+        var row = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = false, Margin = Padding.Empty };
+        row.Controls.Add(_txtIp);
+        row.Controls.Add(_numPort);
+        return row;
+    }
+
+    private static void AddFormRow(TableLayoutPanel layout, int row, string label, Control control)
+    {
+        layout.Controls.Add(new Label
+        {
+            Text = label,
+            Dock = DockStyle.Fill,
+            TextAlign = ContentAlignment.MiddleLeft,
+            Font = new Font("Microsoft YaHei UI", 9.5F, FontStyle.Bold),
+            ForeColor = Color.FromArgb(89, 50, 25)
+        }, 0, row);
+        control.Margin = new Padding(0, 6, 0, 0);
+        layout.Controls.Add(control, 1, row);
+    }
+
+    private void CenterLoginCard()
+    {
+        _loginCard.Left = Math.Max(24, (_loginPage.Width - _loginCard.Width) / 2);
+        _loginCard.Top = Math.Max(150, (_loginPage.Height - _loginCard.Height) / 2 + 12);
+    }
+
+    private void BuildMainShell()
+    {
         var root = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
             ColumnCount = 1,
             RowCount = 2,
-            Padding = new Padding(14),
-            BackColor = BackColor
+            Padding = new Padding(12),
+            BackColor = Color.FromArgb(238, 224, 184)
         };
-        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 44));
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 46));
         root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        Controls.Add(root);
+        _mainShell.Controls.Add(root);
 
-        var header = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.LeftToRight, WrapContents = false };
+        var header = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            FlowDirection = FlowDirection.LeftToRight,
+            WrapContents = false,
+            BackColor = Color.FromArgb(238, 224, 184)
+        };
         header.Controls.AddRange([
-            Label("服务器"), _txtIp, Label("端口"), _numPort, Button("连接", ConnectAsync),
-            Label("用户名"), _txtUser, Label("密码"), _txtPassword, Button("注册", RegisterAsync), Button("登录", LoginAsync),
-            Spacer(20), _lblUser, Spacer(14), _lblStatus
+            _lblUser,
+            Spacer(16),
+            _lblToken,
+            Spacer(16),
+            Button("刷新房间", () => SendAsync("GetRoomList")),
+            Button("回到登录页", ShowLoginPage),
+            Spacer(18),
+            _lblStatus
         ]);
         root.Controls.Add(header, 0, 0);
 
@@ -95,18 +242,15 @@ public class MainForm : Form
 
     private TabPage BuildLobbyTab()
     {
-        var page = Page("大厅");
+        var page = Page("房间大厅");
         var layout = Split();
         page.Controls.Add(layout);
 
         var left = new TableLayoutPanel { Dock = DockStyle.Fill, RowCount = 2 };
-        left.RowStyles.Add(new RowStyle(SizeType.Absolute, 42));
+        left.RowStyles.Add(new RowStyle(SizeType.Absolute, 48));
         left.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         var toolbar = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = false };
         toolbar.Controls.AddRange([
-            Button("刷新房间", () => SendAsync("GetRoomList")),
-            Label("房间名"), _txtRoomName,
-            Label("人数"), _numMaxPlayers,
             Button("创建房间", CreateRoomAsync),
             Button("加入选中", JoinRoomAsync),
             Button("离开房间", () => SendAsync("LeaveRoom")),
@@ -116,63 +260,50 @@ public class MainForm : Form
         left.Controls.Add(_roomGrid, 0, 1);
         layout.Panel1.Controls.Add(left);
 
-        var help = new RichTextBox
+        var preview = new Panel
         {
             Dock = DockStyle.Fill,
-            ReadOnly = true,
-            BorderStyle = BorderStyle.None,
-            BackColor = Color.FromArgb(250, 251, 252),
-            Text = "演示流程\r\n\r\n1. 启动 MonopolyServer。\r\n2. 打开两个客户端，使用不同用户名登录。\r\n3. 一个客户端创建房间，另一个加入。\r\n4. 双方点击准备后自动开局。\r\n5. 轮到自己时掷骰、购买、结束回合。\r\n\r\n该客户端通过 TcpClient + NetworkStream 与服务器通信；数据库表数据通过 DataGridView 管理。"
+            BackgroundImage = AssetCatalog.GetImage("棋盘中间.png"),
+            BackgroundImageLayout = ImageLayout.Zoom,
+            BackColor = Color.FromArgb(33, 67, 49)
         };
-        layout.Panel2.Controls.Add(help);
+        layout.Panel2.Controls.Add(preview);
         return page;
     }
 
     private TabPage BuildGameTab()
     {
-        var page = Page("游戏");
+        var page = Page("游戏棋盘");
         var layout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1 };
-        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 58));
-        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 42));
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 66));
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 34));
         page.Controls.Add(layout);
 
-        var boardPanel = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 5, RowCount = 4, Padding = new Padding(4) };
-        for (var i = 0; i < 5; i++) boardPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 20));
-        for (var i = 0; i < 4; i++) boardPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 25));
-
-        for (var i = 0; i < _cellButtons.Length; i++)
+        var boardHost = new Panel
         {
-            var button = new Button
-            {
-                Dock = DockStyle.Fill,
-                Margin = new Padding(5),
-                FlatStyle = FlatStyle.Flat,
-                TextAlign = ContentAlignment.MiddleLeft,
-                Font = new Font(Font.FontFamily, 9F, FontStyle.Bold),
-                Enabled = false
-            };
-            button.FlatAppearance.BorderColor = Color.FromArgb(199, 205, 214);
-            _cellButtons[i] = button;
-            boardPanel.Controls.Add(button, i % 5, i / 5);
-        }
-        layout.Controls.Add(boardPanel, 0, 0);
+            Dock = DockStyle.Fill,
+            Padding = new Padding(10),
+            BackColor = Color.FromArgb(29, 58, 44)
+        };
+        boardHost.Controls.Add(_boardView);
+        layout.Controls.Add(boardHost, 0, 0);
 
         var side = new TableLayoutPanel { Dock = DockStyle.Fill, RowCount = 6, Padding = new Padding(8) };
-        side.RowStyles.Add(new RowStyle(SizeType.Absolute, 34));
-        side.RowStyles.Add(new RowStyle(SizeType.Absolute, 44));
-        side.RowStyles.Add(new RowStyle(SizeType.Percent, 25));
-        side.RowStyles.Add(new RowStyle(SizeType.Percent, 25));
-        side.RowStyles.Add(new RowStyle(SizeType.Percent, 25));
-        side.RowStyles.Add(new RowStyle(SizeType.Percent, 25));
+        side.RowStyles.Add(new RowStyle(SizeType.Absolute, 36));
+        side.RowStyles.Add(new RowStyle(SizeType.Absolute, 70));
+        side.RowStyles.Add(new RowStyle(SizeType.Percent, 26));
+        side.RowStyles.Add(new RowStyle(SizeType.Percent, 28));
+        side.RowStyles.Add(new RowStyle(SizeType.Percent, 28));
+        side.RowStyles.Add(new RowStyle(SizeType.Percent, 18));
 
         var controls = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = false };
-        controls.Controls.AddRange([_btnRoll, _btnBuy, _btnEnd]);
+        controls.Controls.AddRange([_dicePicture, _btnRoll, _btnBuy, _btnEnd]);
         side.Controls.Add(_lblTurn, 0, 0);
         side.Controls.Add(controls, 0, 1);
         side.Controls.Add(Group("玩家状态", _playerGrid), 0, 2);
         side.Controls.Add(Group("地产状态", _propertyGrid), 0, 3);
         side.Controls.Add(Group("游戏日志", _logList), 0, 4);
-        side.Controls.Add(new Panel(), 0, 5);
+        side.Controls.Add(new Panel { BackColor = Color.Transparent }, 0, 5);
         layout.Controls.Add(side, 1, 0);
         return page;
     }
@@ -181,9 +312,9 @@ public class MainForm : Form
     {
         var page = Page("数据管理");
         var tabs = new TabControl { Dock = DockStyle.Fill };
-        tabs.TabPages.Add(ManagePage("地图格子", _mapGrid, () => AddLocalMapRow(), SaveMapAsync, DeleteMapAsync));
-        tabs.TabPages.Add(ManagePage("地产配置", _managePropertyGrid, () => AddLocalPropertyRow(), SavePropertyAsync, DeletePropertyAsync));
-        tabs.TabPages.Add(ManagePage("事件卡", _eventGrid, () => AddLocalEventRow(), SaveEventAsync, DeleteEventAsync));
+        tabs.TabPages.Add(ManagePage("地图格子", _mapGrid, AddLocalMapRow, SaveMapAsync, DeleteMapAsync));
+        tabs.TabPages.Add(ManagePage("地产配置", _managePropertyGrid, AddLocalPropertyRow, SavePropertyAsync, DeletePropertyAsync));
+        tabs.TabPages.Add(ManagePage("事件卡", _eventGrid, AddLocalEventRow, SaveEventAsync, DeleteEventAsync));
         page.Controls.Add(tabs);
         return page;
     }
@@ -194,7 +325,7 @@ public class MainForm : Form
         var layout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 2 };
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
-        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 42));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 48));
         layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         var buttons = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = false };
         buttons.Controls.AddRange([Button("刷新排行榜", () => SendAsync("GetRankList")), Button("刷新历史", () => SendAsync("GetHistory"))]);
@@ -228,12 +359,17 @@ public class MainForm : Form
 
     private void RegisterAsync()
     {
-        SendAsync("Register", new AuthRequest(_txtUser.Text.Trim(), _txtPassword.Text));
+        SendAsync("Register", BuildAuthRequest());
     }
 
     private void LoginAsync()
     {
-        SendAsync("Login", new AuthRequest(_txtUser.Text.Trim(), _txtPassword.Text));
+        SendAsync("Login", BuildAuthRequest());
+    }
+
+    private AuthRequest BuildAuthRequest()
+    {
+        return new AuthRequest(_txtUser.Text.Trim(), _txtPassword.Text, SelectedToken().ImageFile);
     }
 
     private void CreateRoomAsync()
@@ -262,8 +398,13 @@ public class MainForm : Form
                 case "CreateRoomResult":
                 case "JoinRoomResult":
                 case "ReadyResult":
-                case "BuyPropertyResult":
                     ShowBasic(message.ReadData<BasicResult>());
+                    break;
+                case "BuyPropertyResult":
+                    ShowBuyResult(message);
+                    break;
+                case "DiceResult":
+                    ApplyDice(message.ReadData<DiceResultDto>());
                     break;
                 case "LeaveRoomResult":
                     _lastGameStatus = "";
@@ -289,6 +430,13 @@ public class MainForm : Form
                     break;
                 case "YourTurn":
                     SetStatus("轮到你行动", false);
+                    break;
+                case "GameStart":
+                case "MoveResult":
+                case "RentPaid":
+                case "ChanceResult":
+                case "TaxResult":
+                case "PlayerBankrupt":
                     break;
                 case "GameOver":
                     var over = message.ReadData<GameOverDto>();
@@ -316,8 +464,12 @@ public class MainForm : Form
 
         _userId = result.UserId;
         _userName = result.UserName;
-        _lblUser.Text = $"当前用户：{_userName} (ID {_userId})";
+        var token = SelectedToken();
+        _boardView.SetToken(_userId, token.ImageFile);
+        _lblUser.Text = $"当前玩家：{_userName} (ID {_userId})";
+        _lblToken.Text = $"棋子：{token.DisplayName}";
         SetStatus(result.Message, false);
+        ShowMainShell();
         SendAsync("GetRoomList");
         SendAsync("GetManageData");
         SendAsync("GetRankList");
@@ -326,13 +478,9 @@ public class MainForm : Form
 
     private void ApplyGameState(GameStateDto state)
     {
-        // 游戏开始时自动切换到"游戏"标签页
         if (state.Status == "Playing" && _lastGameStatus != "Playing")
         {
-            if (_tabs.TabPages.Count > 1)
-            {
-                _tabs.SelectedIndex = 1;
-            }
+            _tabs.SelectedIndex = 1;
         }
         _lastGameStatus = state.Status;
 
@@ -340,17 +488,7 @@ public class MainForm : Form
             ? $"房间 {state.RoomId} | 第 {state.RoundNumber} 回合 | 当前：{state.CurrentPlayerName}"
             : $"房间 {state.RoomId} | 状态：{state.Status}";
 
-        for (var i = 0; i < _cellButtons.Length; i++)
-        {
-            var cell = state.MapCells.FirstOrDefault(x => x.CellIndex == i);
-            var players = state.Players.Where(x => x.Position == i && !x.IsBankrupt).Select(x => x.UserName).ToList();
-            var property = cell is null ? null : state.Properties.FirstOrDefault(x => x.MapCellId == cell.Id);
-            _cellButtons[i].Text = cell is null
-                ? $"{i}\r\n未配置"
-                : $"{i} {cell.CellName}\r\n{cell.CellType}\r\n{(property?.OwnerUserName is null ? string.Empty : $"业主:{property.OwnerUserName}")}\r\n{string.Join(",", players)}";
-            _cellButtons[i].BackColor = CellColor(cell?.CellType);
-        }
-
+        _boardView.ApplyState(state);
         _playerGrid.DataSource = state.Players;
         _propertyGrid.DataSource = state.Properties;
         _logList.DataSource = state.Logs.ToList();
@@ -367,9 +505,47 @@ public class MainForm : Form
         _eventGrid.DataSource = _eventRows;
     }
 
+    private void ApplyDice(DiceResultDto dice)
+    {
+        _dicePicture.Image = AssetCatalog.GetImage($"{dice.Dice}.png");
+        SetStatus($"{dice.UserName} 掷出 {dice.Dice} 点", false);
+    }
+
+    private void ShowBuyResult(NetMessage message)
+    {
+        try
+        {
+            var buy = message.ReadData<BuyPropertyResultDto>();
+            SetStatus(buy.Message, !buy.Success);
+        }
+        catch
+        {
+            ShowBasic(message.ReadData<BasicResult>());
+        }
+    }
+
     private void ShowBasic(BasicResult result)
     {
         SetStatus(result.Message, !result.Success);
+    }
+
+    private void ShowMainShell()
+    {
+        _loginPage.Visible = false;
+        _mainShell.Visible = true;
+        _mainShell.BringToFront();
+    }
+
+    private void ShowLoginPage()
+    {
+        _mainShell.Visible = false;
+        _loginPage.Visible = true;
+        _loginPage.BringToFront();
+    }
+
+    private TokenOption SelectedToken()
+    {
+        return _tokenCombo.SelectedItem as TokenOption ?? AssetCatalog.TokenOptions[0];
     }
 
     private void SetGameButtons(bool isMyTurn, bool canBuy = false)
@@ -470,12 +646,14 @@ public class MainForm : Form
     private void SetStatus(string text, bool error)
     {
         _lblStatus.Text = text;
-        _lblStatus.ForeColor = error ? Color.FromArgb(182, 42, 42) : Color.FromArgb(28, 109, 72);
+        _lblStatus.ForeColor = error ? Color.FromArgb(173, 35, 38) : Color.FromArgb(25, 99, 66);
+        _lblLoginStatus.Text = text;
+        _lblLoginStatus.ForeColor = _lblStatus.ForeColor;
     }
 
     private static TabPage Page(string title)
     {
-        return new TabPage(title) { BackColor = Color.FromArgb(244, 246, 248), Padding = new Padding(10) };
+        return new TabPage(title) { BackColor = Color.FromArgb(238, 224, 184), Padding = new Padding(10) };
     }
 
     private static SplitContainer Split()
@@ -490,7 +668,14 @@ public class MainForm : Form
 
     private static GroupBox Group(string title, Control content)
     {
-        var group = new GroupBox { Text = title, Dock = DockStyle.Fill, Padding = new Padding(8) };
+        var group = new GroupBox
+        {
+            Text = title,
+            Dock = DockStyle.Fill,
+            Padding = new Padding(8),
+            BackColor = Color.FromArgb(245, 236, 207),
+            ForeColor = Color.FromArgb(72, 45, 25)
+        };
         content.Dock = DockStyle.Fill;
         group.Controls.Add(content);
         return group;
@@ -498,9 +683,9 @@ public class MainForm : Form
 
     private static TabPage ManagePage(string title, DataGridView grid, Action add, Action save, Action delete)
     {
-        var page = new TabPage(title) { Padding = new Padding(8), BackColor = Color.FromArgb(244, 246, 248) };
+        var page = new TabPage(title) { Padding = new Padding(8), BackColor = Color.FromArgb(238, 224, 184) };
         var layout = new TableLayoutPanel { Dock = DockStyle.Fill, RowCount = 2 };
-        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 42));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 46));
         layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         var toolbar = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = false };
         toolbar.Controls.AddRange([Button("刷新", () => ActiveFormSend("GetManageData")), Button("新增行", add), Button("保存选中", save), Button("删除数据库记录", delete)]);
@@ -524,20 +709,16 @@ public class MainForm : Form
         {
             Text = text,
             AutoSize = true,
-            Height = 30,
-            Margin = new Padding(4, 4, 4, 4),
-            BackColor = Color.FromArgb(34, 93, 137),
+            Height = 32,
+            Margin = new Padding(5, 5, 5, 5),
+            BackColor = Color.FromArgb(125, 51, 27),
             ForeColor = Color.White,
-            FlatStyle = FlatStyle.Flat
+            FlatStyle = FlatStyle.Flat,
+            Font = new Font("Microsoft YaHei UI", 9F, FontStyle.Bold)
         };
         button.FlatAppearance.BorderSize = 0;
         button.Click += (_, _) => click();
         return button;
-    }
-
-    private static Label Label(string text)
-    {
-        return new Label { AutoSize = true, Text = text, TextAlign = ContentAlignment.MiddleCenter, Margin = new Padding(10, 9, 2, 0) };
     }
 
     private static Control Spacer(int width)
@@ -556,28 +737,22 @@ public class MainForm : Form
             AllowUserToAddRows = false,
             AllowUserToDeleteRows = false,
             ReadOnly = !editable,
-            BackgroundColor = Color.White,
+            BackgroundColor = Color.FromArgb(252, 248, 235),
             BorderStyle = BorderStyle.None,
             RowHeadersVisible = false,
             EnableHeadersVisualStyles = false,
             ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle
             {
-                BackColor = Color.FromArgb(38, 50, 56),
+                BackColor = Color.FromArgb(81, 60, 34),
                 ForeColor = Color.White,
                 Font = new Font("Microsoft YaHei UI", 9F, FontStyle.Bold)
+            },
+            DefaultCellStyle = new DataGridViewCellStyle
+            {
+                BackColor = Color.FromArgb(252, 248, 235),
+                SelectionBackColor = Color.FromArgb(171, 116, 52),
+                SelectionForeColor = Color.White
             }
-        };
-    }
-
-    private static Color CellColor(string? type)
-    {
-        return type switch
-        {
-            "Start" => Color.FromArgb(218, 242, 229),
-            "Property" => Color.FromArgb(225, 236, 252),
-            "Chance" => Color.FromArgb(255, 244, 204),
-            "Tax" => Color.FromArgb(255, 224, 224),
-            _ => Color.FromArgb(239, 241, 244)
         };
     }
 
