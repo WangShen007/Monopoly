@@ -592,7 +592,7 @@ public class MainForm : Form
         };
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 52));
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 98));
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 112));
 
         var token = new PictureBox
         {
@@ -636,17 +636,15 @@ public class MainForm : Form
         layout.Controls.Add(main, 1, 0);
 
         var right = new TableLayoutPanel { Dock = DockStyle.Fill, RowCount = 3, BackColor = Color.Transparent };
-        right.RowStyles.Add(new RowStyle(SizeType.Absolute, 26));
+        right.RowStyles.Add(new RowStyle(SizeType.Absolute, 38));
         right.RowStyles.Add(new RowStyle(SizeType.Absolute, 28));
         right.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        right.Controls.Add(new Label
+        right.Controls.Add(new MoneyBillView
         {
-            Text = player.IsBankrupt ? "破产" : $"{player.Money:N0}",
             Dock = DockStyle.Fill,
-            AutoEllipsis = true,
-            TextAlign = ContentAlignment.MiddleRight,
-            Font = new Font("Microsoft YaHei UI", 11F, FontStyle.Bold),
-            ForeColor = player.IsBankrupt ? Color.FromArgb(143, 55, 48) : Color.FromArgb(33, 101, 70)
+            Money = player.Money,
+            IsBankrupt = player.IsBankrupt,
+            Margin = new Padding(0, 0, 0, 2)
         }, 0, 0);
 
         var badges = new FlowLayoutPanel
