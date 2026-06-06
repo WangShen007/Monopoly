@@ -28,7 +28,6 @@ public class MainForm : Form
     private readonly DataGridView _propertyGrid = Grid();
     private readonly ListBox _logList = new() { Dock = DockStyle.Fill, IntegralHeight = false };
     private readonly Label _lblTurn = new() { AutoSize = true, Text = "当前回合：-" };
-    private readonly PictureBox _dicePicture = new() { Width = 58, Height = 58, SizeMode = PictureBoxSizeMode.Zoom };
     private readonly Button _btnRoll = new() { Text = "掷骰子", Width = 92, Height = 34 };
     private readonly Button _btnBuy = new() { Text = "购买地产", Width = 92, Height = 34 };
     private readonly Button _btnEnd = new() { Text = "结束回合", Width = 92, Height = 34 };
@@ -297,7 +296,7 @@ public class MainForm : Form
         side.RowStyles.Add(new RowStyle(SizeType.Percent, 18));
 
         var controls = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = false };
-        controls.Controls.AddRange([_dicePicture, _btnRoll, _btnBuy, _btnEnd]);
+        controls.Controls.AddRange([_btnRoll, _btnBuy, _btnEnd]);
         side.Controls.Add(_lblTurn, 0, 0);
         side.Controls.Add(controls, 0, 1);
         side.Controls.Add(Group("玩家状态", _playerGrid), 0, 2);
@@ -507,7 +506,7 @@ public class MainForm : Form
 
     private void ApplyDice(DiceResultDto dice)
     {
-        _dicePicture.Image = AssetCatalog.GetImage($"{dice.Dice}.png");
+        _boardView.ShowDice(dice);
         SetStatus($"{dice.UserName} 掷出 {dice.Dice} 点", false);
     }
 

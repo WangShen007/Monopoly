@@ -4,14 +4,21 @@ namespace MonopolyClient.Visuals;
 
 public class BoardView : Control
 {
+    private const int DiceAnimationDurationMs = 260;
+
     private readonly Dictionary<int, string> _playerTokens = [];
+    private readonly Random _diceRandom = new();
+    private readonly System.Windows.Forms.Timer _diceTimer = new() { Interval = 16 };
     private GameStateDto? _state;
+    private DiceDisplay? _diceDisplay;
+    private DateTime _diceAnimationStartedAtUtc;
 
     public BoardView()
     {
         DoubleBuffered = true;
         BackColor = Color.FromArgb(31, 54, 42);
         MinimumSize = new Size(560, 560);
+        _diceTimer.Tick += (_, _) => AdvanceDiceAnimation();
     }
 
     public void SetToken(int userId, string imageFile)
@@ -26,7 +33,42 @@ public class BoardView : Control
     public void ApplyState(GameStateDto state)
     {
         _state = state;
+        if (state.Status != "Playing")
+        {
+            _diceTimer.Stop();
+            _diceDisplay = null;
+        }
+
         Invalidate();
+    }
+
+    public void ShowDice(DiceResultDto dice)
+    {
+        if (dice.Dice is < 1 or > 6)
+        {
+            return;
+        }
+
+        _diceAnimationStartedAtUtc = DateTime.UtcNow;
+        _diceDisplay = new DiceDisplay(
+            dice.UserId,
+            dice.UserName,
+            dice.Dice,
+            _diceRandom.Next(1, 7),
+            0F);
+        _diceTimer.Stop();
+        _diceTimer.Start();
+        Invalidate();
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            _diceTimer.Dispose();
+        }
+
+        base.Dispose(disposing);
     }
 
     protected override void OnPaint(PaintEventArgs e)
@@ -41,10 +83,13 @@ public class BoardView : Control
         if (_state is null)
         {
             DrawEmptyBoard(e.Graphics, board);
-            return;
+        }
+        else
+        {
+            DrawCells(e.Graphics, board, _state);
         }
 
-        DrawCells(e.Graphics, board, _state);
+        DrawDiceDisplay(e.Graphics, GetCenterRect(board));
     }
 
     private Rectangle GetBoardBounds()
@@ -238,6 +283,162 @@ public class BoardView : Control
         }
     }
 
+    private void AdvanceDiceAnimation()
+    {
+        if (_diceDisplay is null)
+        {
+            _diceTimer.Stop();
+            return;
+        }
+
+        var elapsed = (DateTime.UtcNow - _diceAnimationStartedAtUtc).TotalMilliseconds;
+        var progress = Math.Clamp((float)(elapsed / DiceAnimationDurationMs), 0F, 1F);
+        var display = _diceDisplay.Value;
+        _diceDisplay = progress >= 1F
+            ? display with { DisplayValue = display.FinalValue, Progress = 1F }
+            : display with { DisplayValue = _diceRandom.Next(1, 7), Progress = progress };
+
+        if (progress >= 1F)
+        {
+            _diceTimer.Stop();
+        }
+
+        Invalidate();
+    }
+
+    private void DrawDiceDisplay(Graphics graphics, Rectangle center)
+    {
+        if (_diceDisplay is null || center.Width <= 0 || center.Height <= 0)
+        {
+            return;
+        }
+
+        var display = _diceDisplay.Value;
+        var eased = EaseOutCubic(display.Progress);
+        var panelWidth = Math.Min(center.Width - 24, Math.Max(150, center.Width / 2));
+        var panelHeight = Math.Min(center.Height - 24, Math.Max(140, center.Height * 2 / 5));
+        var panel = CenteredRectangle(center, panelWidth, panelHeight);
+        var shadow = panel;
+        shadow.Offset(0, 5);
+
+        using var shadowBrush = new SolidBrush(Color.FromArgb(92, 30, 24, 13));
+        using var panelBrush = new SolidBrush(Color.FromArgb(224, 246, 225, 176));
+        using var border = new Pen(Color.FromArgb(145, 88, 36), 2);
+        graphics.FillRoundedRectangle(shadowBrush, shadow, 14);
+        graphics.FillRoundedRectangle(panelBrush, panel, 14);
+        graphics.DrawRoundedRectangle(border, panel, 14);
+
+        using var titleFont = new Font("Microsoft YaHei UI", 9F, FontStyle.Bold);
+        using var valueFont = new Font("Microsoft YaHei UI", 10.5F, FontStyle.Bold);
+        using var darkBrush = new SolidBrush(Color.FromArgb(72, 45, 25));
+        using var accentBrush = new SolidBrush(Color.FromArgb(125, 51, 27));
+
+        var titleRect = new Rectangle(panel.Left + 10, panel.Top + 8, panel.Width - 20, 24);
+        var valueRect = new Rectangle(panel.Left + 10, panel.Bottom - 32, panel.Width - 20, 24);
+        graphics.DrawString($"{display.UserName} 掷出", titleFont, darkBrush, titleRect, CenterFormat());
+        graphics.DrawString($"{display.DisplayValue} 点", valueFont, accentBrush, valueRect, CenterFormat());
+
+        var diceSize = Math.Min(96, Math.Max(62, panel.Height - 74));
+        var diceRect = new Rectangle(
+            panel.Left + (panel.Width - diceSize) / 2,
+            panel.Top + 34,
+            diceSize,
+            diceSize);
+        DrawAnimatedDice(graphics, diceRect, display.DisplayValue, eased);
+    }
+
+    private static void DrawAnimatedDice(Graphics graphics, Rectangle rect, int value, float progress)
+    {
+        var wobble = (float)Math.Sin(progress * Math.PI * 4) * (1F - progress);
+        var angle = wobble * 9F;
+        var lift = (int)Math.Round(-7 * Math.Sin(progress * Math.PI) * (1F - progress));
+        var scale = 0.96F + 0.04F * progress + 0.03F * (float)Math.Sin(progress * Math.PI) * (1F - progress);
+        var centerX = rect.Left + rect.Width / 2F;
+        var centerY = rect.Top + rect.Height / 2F + lift;
+        var saved = graphics.Save();
+
+        graphics.TranslateTransform(centerX, centerY);
+        graphics.RotateTransform(angle);
+        graphics.ScaleTransform(scale, scale);
+        var drawRect = new Rectangle(
+            -rect.Width / 2,
+            -rect.Height / 2,
+            rect.Width,
+            rect.Height);
+
+        var image = AssetCatalog.GetImage($"{value}.png");
+        if (image is not null)
+        {
+            graphics.DrawImage(image, drawRect);
+        }
+        else
+        {
+            DrawDiceFallback(graphics, drawRect, value);
+        }
+
+        graphics.Restore(saved);
+    }
+
+    private static void DrawDiceFallback(Graphics graphics, Rectangle rect, int value)
+    {
+        using var faceBrush = new SolidBrush(Color.White);
+        using var border = new Pen(Color.FromArgb(117, 74, 35), 2);
+        using var pipBrush = new SolidBrush(Color.FromArgb(44, 32, 23));
+        graphics.FillRoundedRectangle(faceBrush, rect, 10);
+        graphics.DrawRoundedRectangle(border, rect, 10);
+
+        var pip = Math.Max(6, rect.Width / 9);
+        var left = rect.Left + rect.Width / 4;
+        var center = rect.Left + rect.Width / 2;
+        var right = rect.Right - rect.Width / 4;
+        var top = rect.Top + rect.Height / 4;
+        var middle = rect.Top + rect.Height / 2;
+        var bottom = rect.Bottom - rect.Height / 4;
+
+        void Pip(int x, int y)
+        {
+            graphics.FillEllipse(pipBrush, x - pip / 2, y - pip / 2, pip, pip);
+        }
+
+        if (value is 1 or 3 or 5)
+        {
+            Pip(center, middle);
+        }
+
+        if (value is >= 2)
+        {
+            Pip(left, top);
+            Pip(right, bottom);
+        }
+
+        if (value is >= 4)
+        {
+            Pip(right, top);
+            Pip(left, bottom);
+        }
+
+        if (value == 6)
+        {
+            Pip(left, middle);
+            Pip(right, middle);
+        }
+    }
+
+    private static Rectangle CenteredRectangle(Rectangle bounds, int width, int height)
+    {
+        return new Rectangle(
+            bounds.Left + (bounds.Width - width) / 2,
+            bounds.Top + (bounds.Height - height) / 2,
+            width,
+            height);
+    }
+
+    private static float EaseOutCubic(float value)
+    {
+        var inverse = 1F - value;
+        return 1F - inverse * inverse * inverse;
+    }
+
     private static Color FallbackCellColor(string type)
     {
         return type switch
@@ -261,6 +462,8 @@ public class BoardView : Control
         };
     }
 }
+
+internal readonly record struct DiceDisplay(int UserId, string UserName, int FinalValue, int DisplayValue, float Progress);
 
 internal readonly record struct BoardGeometry(Rectangle Board, int RingThickness)
 {
@@ -315,5 +518,17 @@ internal static class GraphicsExtensions
         path.AddArc(bounds.Left, bounds.Bottom - diameter, diameter, diameter, 90, 90);
         path.CloseFigure();
         graphics.FillPath(brush, path);
+    }
+
+    public static void DrawRoundedRectangle(this Graphics graphics, Pen pen, Rectangle bounds, int radius)
+    {
+        using var path = new System.Drawing.Drawing2D.GraphicsPath();
+        var diameter = radius * 2;
+        path.AddArc(bounds.Left, bounds.Top, diameter, diameter, 180, 90);
+        path.AddArc(bounds.Right - diameter, bounds.Top, diameter, diameter, 270, 90);
+        path.AddArc(bounds.Right - diameter, bounds.Bottom - diameter, diameter, diameter, 0, 90);
+        path.AddArc(bounds.Left, bounds.Bottom - diameter, diameter, diameter, 90, 90);
+        path.CloseFigure();
+        graphics.DrawPath(pen, path);
     }
 }
