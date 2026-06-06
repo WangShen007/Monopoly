@@ -34,7 +34,7 @@ public class NetMessage
 }
 
 public record EmptyDto;
-public record AuthRequest(string UserName, string Password);
+public record AuthRequest(string UserName, string Password, string? TokenImageFile = null);
 public record BasicResult(bool Success, string Message);
 public record LoginResult(bool Success, string Message, int UserId, string UserName);
 public record CreateRoomRequest(string RoomName, int MaxPlayers);
@@ -88,7 +88,8 @@ public record PlayerStateDto(
     bool IsBankrupt,
     bool IsReady,
     int OwnedProperties,
-    int FreeRentCards);
+    int FreeRentCards,
+    string TokenImageFile = "棋子-1.png");
 
 public record PropertyStateDto(
     int PropertyId,
