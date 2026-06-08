@@ -435,14 +435,50 @@ public class RoomService
         }
 
         var card = room.EventCards[_random.Next(room.EventCards.Count)];
+        var oldPosition = player.Position;
+        var passedStart = false;
+        var isBackward = false;
         GameRules.ApplyEvent(
             player,
             card,
-            steps => GameRules.Move(player, steps, room.MapCells.Count),
-            () => player.Position = 0);
+            steps =>
+            {
+                isBackward = steps < 0;
+                var result = GameRules.Move(player, steps, room.MapCells.Count);
+                passedStart = result.PassedStart;
+            },
+            () =>
+            {
+                isBackward = ShouldAnimateBackwardToStart(player.Position, room.MapCells.Count);
+                player.Position = 0;
+            });
         AddAction(room, player.UserId, "Chance", $"{player.UserName} 触发机会卡：{card.Description}");
         AddLog(room, $"{player.UserName} 触发机会卡：{card.Description}");
         AddNotification(room, "ChanceResult", new ChanceResultDto(player.UserId, card.EventName, card.EventType, card.Value, card.Description));
+        if (oldPosition != player.Position)
+        {
+            AddNotification(room, "MoveResult", new MoveResultDto(
+                player.UserId,
+                player.UserName,
+                oldPosition,
+                player.Position,
+                passedStart,
+                player.Money,
+                isBackward));
+        }
+    }
+
+    private static bool ShouldAnimateBackwardToStart(int position, int mapCellCount)
+    {
+        if (mapCellCount <= 0)
+        {
+            return false;
+        }
+
+        var normalized = ((position % mapCellCount) + mapCellCount) % mapCellCount;
+        var forwardDistance = (mapCellCount - normalized) % mapCellCount;
+        var backwardDistance = normalized;
+        return backwardDistance <= forwardDistance;
     }
 
     private void CheckBankruptLocked(GameRoom room, PlayerState player)

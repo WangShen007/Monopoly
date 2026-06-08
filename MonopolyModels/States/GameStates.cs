@@ -9,7 +9,7 @@ public class PlayerState
     public bool IsBankrupt { get; set; }
     public bool IsReady { get; set; }
     public int FreeRentCards { get; set; }
-    public string TokenImageFile { get; set; } = "棋子-1.png";
+    public string TokenImageFile { get; set; } = "棋子-红.png";
 }
 
 public class PropertyState

@@ -40,6 +40,8 @@ public record LoginResult(bool Success, string Message, int UserId, string UserN
 public record CreateRoomRequest(string RoomName, int MaxPlayers);
 public record JoinRoomRequest(int RoomId);
 public record EntityIdRequest(int Id);
+public record ChatRequest(string Text);
+public record ReactionRequest(string ReactionType);
 
 public record RoomSummaryDto(
     int RoomId,
@@ -89,7 +91,7 @@ public record PlayerStateDto(
     bool IsReady,
     int OwnedProperties,
     int FreeRentCards,
-    string TokenImageFile = "棋子-1.png");
+    string TokenImageFile = "棋子-红.png");
 
 public record PropertyStateDto(
     int PropertyId,
@@ -114,13 +116,21 @@ public record GameStateDto(
     bool CanBuyProperty);
 
 public record DiceResultDto(int UserId, string UserName, int Dice, int OldPosition, int NewPosition);
-public record MoveResultDto(int UserId, string UserName, int OldPosition, int NewPosition, bool PassedStart, int Money);
+public record MoveResultDto(int UserId, string UserName, int OldPosition, int NewPosition, bool PassedStart, int Money, bool IsBackward = false);
 public record BuyPropertyResultDto(bool Success, string Message, int UserId, int PropertyId);
 public record RentPaidDto(int FromUserId, int ToUserId, int Amount, bool UsedFreeRentCard);
 public record ChanceResultDto(int UserId, string EventName, string EventType, int Value, string Description);
 public record TaxResultDto(int UserId, int Amount);
 public record PlayerBankruptDto(int UserId, string UserName);
 public record GameOverDto(int WinnerUserId, string WinnerUserName, string EndReason, List<PlayerStateDto> Ranking);
+public record ChatMessageDto(
+    int RoomId,
+    int SenderUserId,
+    string SenderUserName,
+    string TokenImageFile,
+    string MessageType,
+    string Text,
+    DateTime SentAt);
 
 public record ManageDataDto(
     List<MapCellDto> MapCells,

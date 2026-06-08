@@ -9,10 +9,10 @@ public static class AssetCatalog
 
     public static readonly TokenOption[] TokenOptions =
     [
-        new("青铜香炉", "棋子-1.png"),
-        new("瓷塔摆件", "棋子-2.png"),
-        new("文旅盲盒", "文旅盲盒.png"),
-        new("中原文旅券", "钱.png")
+        new("红色棋子", "棋子-红.png"),
+        new("黄色棋子", "棋子-黄.png"),
+        new("蓝色棋子", "棋子-蓝.png"),
+        new("绿色棋子", "棋子-绿.png")
     ];
 
     public static readonly BoardCellInfo[] DefaultBoard =
