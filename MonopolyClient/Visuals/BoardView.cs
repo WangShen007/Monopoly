@@ -4,10 +4,16 @@ namespace MonopolyClient.Visuals;
 
 public class BoardView : Control
 {
-    private const int DiceAnimationDurationMs = 260;
-    private const int TokenMoveStepDurationMs = 120;
+    private const int DiceAnimationDurationMs = 1000;
+    private const int TokenMoveStepDurationMs = 620;
 
     private readonly Dictionary<int, string> _playerTokens = [];
+    private static readonly Dictionary<int, int> DefaultPropertyPrices = AssetCatalog.DefaultBoard
+        .Where(x => x.Type == "Property")
+        .OrderBy(x => x.Index)
+        .Select((cell, order) => new { cell.Index, Price = 200 + order * 20 })
+        .ToDictionary(x => x.Index, x => x.Price);
+
     private readonly Random _diceRandom = new();
     private readonly System.Windows.Forms.Timer _diceTimer = new() { Interval = 16 };
     private readonly System.Windows.Forms.Timer _tokenMoveTimer = new() { Interval = 16 };
@@ -128,11 +134,12 @@ public class BoardView : Control
 
         DrawMovingPlayer(e.Graphics, board);
         DrawDiceDisplay(e.Graphics, GetCenterRect(board));
+        DrawPlayerMoneyLedger(e.Graphics, board);
     }
 
     private Rectangle GetBoardBounds()
     {
-        var size = Math.Min(ClientSize.Width, ClientSize.Height) - 16;
+        var size = Math.Min(ClientSize.Width, ClientSize.Height) - 4;
         size = Math.Max(320, size);
         return new Rectangle(
             (ClientSize.Width - size) / 2,
@@ -190,7 +197,16 @@ public class BoardView : Control
     {
         foreach (var cell in AssetCatalog.DefaultBoard)
         {
-            DrawCell(graphics, GetCellRect(board, cell.Index), cell.Index, cell.Name, cell.Type, cell.ImageFile, [], null);
+            DrawCell(
+                graphics,
+                GetCellRect(board, cell.Index),
+                cell.Index,
+                cell.Name,
+                cell.Type,
+                cell.ImageFile,
+                [],
+                null,
+                DefaultPropertyPrices.TryGetValue(cell.Index, out var emptyBoardPrice) ? emptyBoardPrice : null);
         }
     }
 
@@ -204,18 +220,24 @@ public class BoardView : Control
             var players = state.Players
                 .Where(x => x.Position == fallback.Index && !x.IsBankrupt && x.UserId != movingUserId)
                 .ToList();
+            var type = cell?.CellType ?? fallback.Type;
             var property = cell is null
                 ? null
                 : state.Properties.FirstOrDefault(x => x.MapCellId == cell.Id);
+            var displayPrice = property?.Price
+                ?? (type == "Property" && DefaultPropertyPrices.TryGetValue(fallback.Index, out var fallbackPrice)
+                    ? fallbackPrice
+                    : null);
             DrawCell(
                 graphics,
                 GetCellRect(board, fallback.Index),
                 fallback.Index,
                 cell?.CellName ?? fallback.Name,
-                cell?.CellType ?? fallback.Type,
+                type,
                 cell is null ? fallback.ImageFile : AssetCatalog.GetCellImageFile(cell),
                 players,
-                property);
+                property,
+                displayPrice);
         }
     }
 
@@ -227,13 +249,16 @@ public class BoardView : Control
         string type,
         string imageFile,
         List<PlayerStateDto> players,
-        PropertyStateDto? property)
+        PropertyStateDto? property,
+        int? displayPrice)
     {
         var inner = Rectangle.Inflate(rect, -4, -4);
         var image = AssetCatalog.GetImage(imageFile);
         if (image is not null)
         {
-            graphics.DrawImage(image, inner);
+            using var matte = new SolidBrush(Color.FromArgb(231, 214, 164));
+            graphics.FillRectangle(matte, inner);
+            DrawImageFit(graphics, image, GetCellImageArea(inner));
         }
         else
         {
@@ -244,33 +269,271 @@ public class BoardView : Control
         using var border = new Pen(players.Count == 0 ? Color.FromArgb(102, 70, 31) : Color.FromArgb(255, 226, 118), players.Count == 0 ? 2 : 4);
         graphics.DrawRectangle(border, inner);
 
+        if (displayPrice is not null)
+        {
+            DrawPriceBadge(graphics, inner, displayPrice.Value);
+        }
+
         if (property?.OwnerUserName is not null)
         {
             DrawOwnerBadge(graphics, inner, property.OwnerUserName);
         }
 
-        DrawCellCaption(graphics, inner, index, name);
+        DrawCellInfo(graphics, inner, index, name, property);
         DrawPlayers(graphics, inner, players);
+    }
+
+    private static void DrawPriceBadge(Graphics graphics, Rectangle rect, int price)
+    {
+        var text = $"¥{price}";
+        using var font = new Font("Microsoft YaHei UI", rect.Width < 78 ? 7.2F : 8.2F, FontStyle.Bold);
+        var measured = Size.Ceiling(graphics.MeasureString(text, font));
+        var badgeHeight = Math.Clamp(rect.Height / 7, 18, 24);
+        var badgeWidth = Math.Min(rect.Width - 10, Math.Max(52, measured.Width + 16));
+        if (badgeWidth <= 40 || badgeHeight <= 16)
+        {
+            return;
+        }
+
+        var footerReserve = CellInfoHeight(rect) + 5;
+        var badge = new Rectangle(
+            rect.Left + (rect.Width - badgeWidth) / 2,
+            Math.Max(rect.Top + 5, rect.Bottom - footerReserve - badgeHeight - 2),
+            badgeWidth,
+            badgeHeight);
+
+        using var shadowBrush = new SolidBrush(Color.FromArgb(150, 42, 24, 8));
+        var shadow = badge;
+        shadow.Offset(1, 2);
+        var radius = Math.Max(5, Math.Min(9, badge.Height / 2));
+        graphics.FillRoundedRectangle(shadowBrush, shadow, radius);
+
+        using var fillBrush = new SolidBrush(Color.FromArgb(244, 255, 221, 77));
+        using var borderPen = new Pen(Color.FromArgb(245, 111, 58, 12), 2F);
+        using var textBrush = new SolidBrush(Color.FromArgb(74, 33, 8));
+        graphics.FillRoundedRectangle(fillBrush, badge, radius);
+        graphics.DrawRoundedRectangle(borderPen, badge, radius);
+        graphics.DrawString(text, font, textBrush, badge, CenterFormat());
+    }
+
+    private void DrawPlayerMoneyLedger(Graphics graphics, Rectangle board)
+    {
+        if (_state is null || _state.Players.Count == 0)
+        {
+            return;
+        }
+
+        var players = _state.Players
+            .OrderBy(x => x.UserId)
+            .ToList();
+        var area = GetMoneyLedgerArea(board, out var vertical);
+        if (area.Width <= 0 || area.Height <= 0)
+        {
+            return;
+        }
+
+        if (vertical)
+        {
+            DrawVerticalMoneyLedger(graphics, area, players);
+        }
+        else
+        {
+            DrawHorizontalMoneyLedger(graphics, area, players);
+        }
+    }
+
+    private Rectangle GetMoneyLedgerArea(Rectangle board, out bool vertical)
+    {
+        const int padding = 14;
+        var rightArea = new Rectangle(
+            board.Right + padding,
+            board.Top + padding,
+            ClientSize.Width - board.Right - padding * 2,
+            board.Height - padding * 2);
+        if (rightArea.Width >= 150 && rightArea.Height >= 86)
+        {
+            vertical = true;
+            return rightArea;
+        }
+
+        var bottomArea = new Rectangle(
+            board.Left + padding,
+            board.Bottom + padding,
+            board.Width - padding * 2,
+            ClientSize.Height - board.Bottom - padding * 2);
+        if (bottomArea.Width >= 150 && bottomArea.Height >= 76)
+        {
+            vertical = false;
+            return bottomArea;
+        }
+
+        vertical = true;
+        return Rectangle.Empty;
+    }
+
+    private static void DrawVerticalMoneyLedger(Graphics graphics, Rectangle area, IReadOnlyList<PlayerStateDto> players)
+    {
+        var aspect = GetMoneyBillAspect();
+        var gap = Math.Clamp(area.Height / 90, 7, 12);
+        var maxBillHeight = (area.Height - gap * (players.Count - 1)) / players.Count;
+        var billWidth = Math.Min(area.Width, Math.Min(340, (int)Math.Round(maxBillHeight * aspect)));
+        var billHeight = (int)Math.Round(billWidth / aspect);
+        if (billHeight * players.Count + gap * (players.Count - 1) > area.Height)
+        {
+            billHeight = Math.Max(1, (area.Height - gap * (players.Count - 1)) / players.Count);
+            billWidth = Math.Min(area.Width, (int)Math.Round(billHeight * aspect));
+        }
+
+        if (billWidth < 136 || billHeight < 64)
+        {
+            return;
+        }
+
+        var totalHeight = billHeight * players.Count + gap * (players.Count - 1);
+        var x = area.Right - billWidth;
+        var y = area.Bottom - totalHeight;
+        for (var i = 0; i < players.Count; i++)
+        {
+            DrawMoneyBillRecord(graphics, new Rectangle(x, y + i * (billHeight + gap), billWidth, billHeight), players[i]);
+        }
+    }
+
+    private static void DrawHorizontalMoneyLedger(Graphics graphics, Rectangle area, IReadOnlyList<PlayerStateDto> players)
+    {
+        var aspect = GetMoneyBillAspect();
+        var gap = Math.Clamp(area.Width / 80, 7, 12);
+        var billWidth = Math.Min(300, (area.Width - gap * (players.Count - 1)) / players.Count);
+        var billHeight = Math.Min(area.Height, (int)Math.Round(billWidth / aspect));
+        billWidth = Math.Min(billWidth, (int)Math.Round(billHeight * aspect));
+        if (billWidth < 136 || billHeight < 64)
+        {
+            return;
+        }
+
+        var totalWidth = billWidth * players.Count + gap * (players.Count - 1);
+        var x = area.Right - totalWidth;
+        var y = area.Bottom - billHeight;
+        for (var i = 0; i < players.Count; i++)
+        {
+            DrawMoneyBillRecord(graphics, new Rectangle(x + i * (billWidth + gap), y, billWidth, billHeight), players[i]);
+        }
+    }
+
+    private static void DrawMoneyBillRecord(Graphics graphics, Rectangle rect, PlayerStateDto player)
+    {
+        var shadow = rect;
+        shadow.Offset(3, 4);
+        using var shadowBrush = new SolidBrush(Color.FromArgb(90, 15, 25, 18));
+        graphics.FillRoundedRectangle(shadowBrush, shadow, 8);
+
+        var image = AssetCatalog.GetImage("钞票.png") ?? AssetCatalog.GetImage("钱.png");
+        if (image is not null)
+        {
+            graphics.DrawImage(image, rect);
+        }
+        else
+        {
+            using var fallback = new SolidBrush(Color.FromArgb(232, 202, 120));
+            graphics.FillRoundedRectangle(fallback, rect, 8);
+        }
+
+        var nameRect = new Rectangle(
+            rect.Left + (int)Math.Round(rect.Width * 0.22F),
+            rect.Top + (int)Math.Round(rect.Height * 0.38F),
+            (int)Math.Round(rect.Width * 0.60F),
+            Math.Max(10, (int)Math.Round(rect.Height * 0.12F)));
+        var moneyRect = new Rectangle(
+            rect.Left + (int)Math.Round(rect.Width * 0.24F),
+            rect.Top + (int)Math.Round(rect.Height * 0.51F),
+            (int)Math.Round(rect.Width * 0.56F),
+            Math.Max(18, (int)Math.Round(rect.Height * 0.24F)));
+        var moneyText = player.IsBankrupt ? "破产" : player.Money.ToString();
+
+        using var nameFont = FitFont(graphics, player.UserName, nameRect, FontStyle.Bold, 5.5F, Math.Max(7F, rect.Height * 0.10F));
+        using var moneyFont = FitFont(graphics, moneyText, moneyRect, FontStyle.Bold, 10F, Math.Max(13F, rect.Height * 0.24F));
+        using var format = CenterFormat();
+        using var nameBrush = new SolidBrush(Color.FromArgb(86, 53, 20));
+        using var moneyBrush = new SolidBrush(player.IsBankrupt ? Color.FromArgb(150, 32, 28) : Color.FromArgb(58, 32, 12));
+        using var outlineBrush = new SolidBrush(Color.FromArgb(155, 255, 235, 174));
+        DrawOutlinedString(graphics, player.UserName, nameFont, nameBrush, outlineBrush, nameRect);
+        graphics.DrawString(moneyText, moneyFont, moneyBrush, moneyRect, format);
+    }
+
+    private static float GetMoneyBillAspect()
+    {
+        var image = AssetCatalog.GetImage("钞票.png") ?? AssetCatalog.GetImage("钱.png");
+        return image is null ? 1.986F : image.Width / (float)image.Height;
+    }
+
+    private static Font FitFont(Graphics graphics, string text, Rectangle textRect, FontStyle style, float minSize, float maxSize)
+    {
+        var clampedMax = Math.Max(minSize, maxSize);
+        for (var size = clampedMax; size >= minSize; size -= 0.5F)
+        {
+            var candidate = new Font("Microsoft YaHei UI", size, style);
+            var measured = graphics.MeasureString(text, candidate);
+            if (measured.Width <= textRect.Width && measured.Height <= textRect.Height)
+            {
+                return candidate;
+            }
+
+            candidate.Dispose();
+        }
+
+        return new Font("Microsoft YaHei UI", minSize, style);
     }
 
     private static void DrawOwnerBadge(Graphics graphics, Rectangle rect, string owner)
     {
-        var badge = new Rectangle(rect.Left + 6, rect.Top + 6, Math.Min(rect.Width - 12, 76), 22);
-        using var brush = new SolidBrush(Color.FromArgb(218, 38, 46, 50));
-        using var font = new Font("Microsoft YaHei UI", 8F, FontStyle.Bold);
+        var badgeWidth = Math.Min(rect.Width - 8, 36);
+        var badge = new Rectangle(rect.Right - badgeWidth - 4, rect.Top + 4, badgeWidth, 18);
+        using var brush = new SolidBrush(Color.FromArgb(210, 38, 46, 50));
+        using var font = new Font("Microsoft YaHei UI", 7F, FontStyle.Bold);
         using var textBrush = new SolidBrush(Color.White);
         graphics.FillRoundedRectangle(brush, badge, 5);
-        graphics.DrawString(owner, font, textBrush, badge, CenterFormat());
+        graphics.DrawString("已购", font, textBrush, badge, CenterFormat());
     }
 
-    private static void DrawCellCaption(Graphics graphics, Rectangle rect, int index, string name)
+    private static void DrawCellInfo(Graphics graphics, Rectangle rect, int index, string name, PropertyStateDto? property)
     {
-        var caption = new Rectangle(rect.Left + 5, rect.Bottom - 27, rect.Width - 10, 22);
-        using var brush = new SolidBrush(Color.FromArgb(215, 246, 225, 176));
-        using var font = new Font("Microsoft YaHei UI", 8F, FontStyle.Bold);
+        var infoHeight = CellInfoHeight(rect);
+        var info = new Rectangle(rect.Left + 4, rect.Bottom - infoHeight - 4, rect.Width - 8, infoHeight);
+        using var nameFont = new Font("Microsoft YaHei UI", rect.Width < 72 ? 7.5F : 8F, FontStyle.Bold);
         using var textBrush = new SolidBrush(Color.FromArgb(58, 35, 17));
-        graphics.FillRoundedRectangle(brush, caption, 5);
-        graphics.DrawString($"{index} {name}", font, textBrush, caption, CenterFormat());
+        using var shadowBrush = new SolidBrush(Color.FromArgb(220, 255, 248, 218));
+        DrawOutlinedString(graphics, name, nameFont, textBrush, shadowBrush, info);
+    }
+
+    private static Rectangle GetCellImageArea(Rectangle rect)
+    {
+        // Artwork should keep its original aspect ratio; fill the tile background first so
+        // any letterboxing looks intentional. Text stays as outlined overlay, not an opaque panel.
+        return Rectangle.Inflate(rect, -2, -2);
+    }
+
+    private static int CellInfoHeight(Rectangle rect)
+    {
+        return rect.Height >= 92 ? 36 : 24;
+    }
+
+    private static void DrawOutlinedString(Graphics graphics, string text, Font font, Brush textBrush, Brush outlineBrush, Rectangle layout)
+    {
+        using var format = CenterFormat();
+        var offsets = new[]
+        {
+            new Point(-1, 0),
+            new Point(1, 0),
+            new Point(0, -1),
+            new Point(0, 1)
+        };
+
+        foreach (var offset in offsets)
+        {
+            var shadowRect = new Rectangle(layout.Left + offset.X, layout.Top + offset.Y, layout.Width, layout.Height);
+            graphics.DrawString(text, font, outlineBrush, shadowRect, format);
+        }
+
+        graphics.DrawString(text, font, textBrush, layout, format);
     }
 
     private void DrawPlayers(Graphics graphics, Rectangle rect, List<PlayerStateDto> players)
@@ -351,8 +614,8 @@ public class BoardView : Control
         var centerY = Lerp(fromRect.Top + fromRect.Height / 2F, toRect.Top + toRect.Height / 2F, eased);
         var size = Lerp(fromRect.Width, toRect.Width, eased);
         var bounce = (float)Math.Sin(stepProgress * Math.PI);
-        var liftedCenterY = centerY - Math.Min(10F, size / 4F) * bounce;
-        var scaledSize = size * (1F + 0.08F * bounce);
+        var liftedCenterY = centerY - Math.Min(24F, size * 0.62F) * bounce;
+        var scaledSize = Math.Min(76F, size * (1.48F + 0.07F * bounce));
         var tokenRect = new RectangleF(
             centerX - scaledSize / 2F,
             liftedCenterY - scaledSize / 2F,
@@ -360,6 +623,30 @@ public class BoardView : Control
             scaledSize);
 
         DrawToken(graphics, tokenRect, animation.TokenImageFile, true);
+    }
+
+    private static void DrawImageFit(Graphics graphics, Image image, Rectangle destination)
+    {
+        if (destination.Width <= 0 || destination.Height <= 0)
+        {
+            return;
+        }
+
+        var sourceAspect = image.Width / (float)image.Height;
+        var destinationAspect = destination.Width / (float)destination.Height;
+        Rectangle drawRect;
+        if (sourceAspect >= destinationAspect)
+        {
+            var height = (int)Math.Round(destination.Width / sourceAspect);
+            drawRect = new Rectangle(destination.Left, destination.Top + (destination.Height - height) / 2, destination.Width, height);
+        }
+        else
+        {
+            var width = (int)Math.Round(destination.Height * sourceAspect);
+            drawRect = new Rectangle(destination.Left + (destination.Width - width) / 2, destination.Top, width, destination.Height);
+        }
+
+        graphics.DrawImage(image, drawRect);
     }
 
     private Rectangle GetAnimatedTokenRect(Rectangle board, int cellIndex, int userId)
@@ -375,15 +662,20 @@ public class BoardView : Control
 
     private static List<Rectangle> GetTokenRects(Rectangle rect, int count)
     {
-        var available = Rectangle.Inflate(rect, -7, -7);
-        available.Height = Math.Max(12, available.Height - 29);
-        var columns = available.Width >= 58 && count > 1 ? 2 : 1;
-        var rows = (int)Math.Ceiling(count / (double)columns);
         const int gap = 3;
+        const int margin = 6;
+        var footerReserve = rect.Height >= 92 ? 40 : 28;
+        var available = new Rectangle(
+            rect.Left + margin,
+            rect.Top + margin,
+            Math.Max(20, rect.Width - margin * 2),
+            Math.Max(20, rect.Height - footerReserve - margin));
+        var columns = available.Width >= 74 && count > 1 ? 2 : 1;
+        var rows = (int)Math.Ceiling(count / (double)columns);
         var tokenSize = Math.Min(
-            34,
+            48,
             Math.Max(
-                14,
+                20,
                 Math.Min(
                     (available.Width - (columns - 1) * gap) / columns,
                     (available.Height - (rows - 1) * gap) / Math.Max(1, rows))));
@@ -513,8 +805,8 @@ public class BoardView : Control
 
         var display = _diceDisplay.Value;
         var eased = EaseOutCubic(display.Progress);
-        var panelWidth = Math.Min(center.Width - 24, Math.Max(150, center.Width / 2));
-        var panelHeight = Math.Min(center.Height - 24, Math.Max(140, center.Height * 2 / 5));
+        var panelWidth = Math.Min(center.Width - 28, Math.Max(260, Math.Min(310, (int)Math.Round(center.Width * 0.68))));
+        var panelHeight = Math.Min(center.Height - 28, Math.Max(270, Math.Min(330, (int)Math.Round(center.Height * 0.74))));
         var panel = CenteredRectangle(center, panelWidth, panelHeight);
         var shadow = panel;
         shadow.Offset(0, 5);
@@ -536,10 +828,14 @@ public class BoardView : Control
         graphics.DrawString($"{display.UserName} 掷出", titleFont, darkBrush, titleRect, CenterFormat());
         graphics.DrawString($"{display.DisplayValue} 点", valueFont, accentBrush, valueRect, CenterFormat());
 
-        var diceSize = Math.Min(96, Math.Max(62, panel.Height - 74));
+        var diceSize = Math.Min(
+            270,
+            Math.Max(
+                210,
+                Math.Min(panel.Width - 22, panel.Height - 54)));
         var diceRect = new Rectangle(
             panel.Left + (panel.Width - diceSize) / 2,
-            panel.Top + 34,
+            panel.Top + 30,
             diceSize,
             diceSize);
         DrawAnimatedDice(graphics, diceRect, display.DisplayValue, eased);
@@ -694,7 +990,9 @@ internal readonly record struct BoardGeometry(Rectangle Board, int RingThickness
 
     public static BoardGeometry From(Rectangle board)
     {
-        var ring = Math.Clamp((int)Math.Round(board.Width * 0.20), 58, board.Width / 4);
+        // Keep every outer-track cell visually consistent: 8 equal cells per side
+        // means each corner and middle segment is approximately square.
+        var ring = Math.Clamp((int)Math.Round(board.Width / 8D), 56, board.Width / 4);
         return new BoardGeometry(board, ring);
     }
 
