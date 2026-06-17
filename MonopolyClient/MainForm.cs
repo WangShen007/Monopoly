@@ -19,7 +19,7 @@ public class MainForm : Form
     private readonly NumericUpDown _numPort = new() { Minimum = 1, Maximum = 65535, Value = 9000, Width = 95 };
     private readonly TextBox _txtUser = new() { Text = "player1", Width = 260 };
     private readonly TextBox _txtPassword = new() { Text = "123456", Width = 260, UseSystemPasswordChar = true };
-    private readonly ComboBox _tokenCombo = new() { Width = 260, DropDownStyle = ComboBoxStyle.DropDownList };
+    private readonly ComboBox _roomTokenCombo = new() { Width = 160, DropDownStyle = ComboBoxStyle.DropDownList };
     private readonly Label _lblLoginStatus = new() { AutoSize = false, Height = 28, Text = "请先连接服务器", TextAlign = ContentAlignment.MiddleCenter };
     private readonly Label _lblStatus = new() { AutoSize = true, Text = "未连接" };
     private readonly Label _lblUser = new() { AutoSize = true, Text = "未登录" };
@@ -51,8 +51,28 @@ public class MainForm : Form
         Dock = DockStyle.Fill,
         MaxLength = 80
     };
+    private readonly GameSoundPlayer _sounds = new();
+    private readonly CheckBox _chkSound = new()
+    {
+        Text = "音效",
+        AutoSize = true,
+        Checked = true,
+        Margin = new Padding(0, 12, 8, 0),
+        ForeColor = Color.FromArgb(64, 44, 25)
+    };
     private readonly DataGridView _propertyGrid = Grid();
-    private readonly ListBox _logList = new() { Dock = DockStyle.Fill, IntegralHeight = false };
+    private readonly TextBox _logText = new()
+    {
+        Dock = DockStyle.Fill,
+        Multiline = true,
+        ReadOnly = true,
+        ScrollBars = ScrollBars.Vertical,
+        WordWrap = true,
+        BorderStyle = BorderStyle.None,
+        BackColor = Color.FromArgb(252, 248, 235),
+        ForeColor = Color.FromArgb(55, 38, 22),
+        Font = new Font("Microsoft YaHei UI", 9F)
+    };
     private readonly Label _lblTurn = new()
     {
         AutoSize = false,
@@ -83,6 +103,8 @@ public class MainForm : Form
 
     private int _userId;
     private string _userName = string.Empty;
+    private string _currentTokenImageFile = "棋子-红.png";
+    private bool _updatingRoomTokenCombo;
     private BindingList<MapCellRow> _mapRows = [];
     private BindingList<PropertyRow> _propertyRows = [];
     private BindingList<EventCardRow> _eventRows = [];
@@ -129,11 +151,13 @@ public class MainForm : Form
 
     private void BuildUi()
     {
-        _tokenCombo.DataSource = AssetCatalog.TokenOptions.ToList();
-        _tokenCombo.DisplayMember = nameof(TokenOption.DisplayName);
+        _roomTokenCombo.DisplayMember = nameof(TokenOption.DisplayName);
+        _roomTokenCombo.ValueMember = nameof(TokenOption.ImageFile);
+        _roomTokenCombo.DataSource = AssetCatalog.TokenOptions.ToList();
 
         Controls.Add(_mainShell);
         Controls.Add(_loginPage);
+        ConfigureRoomGrid();
         ConfigurePropertyGrid();
         BuildLoginPage();
         BuildMainShell();
@@ -188,9 +212,8 @@ public class MainForm : Form
         AddLoginFormRow(1, "服务器", BuildServerRow());
         AddLoginFormRow(2, "玩家名 / ID", _txtUser);
         AddLoginFormRow(3, "通行码", _txtPassword);
-        AddLoginFormRow(4, "棋子", _tokenCombo);
-        AddLoginFormRow(5, "房间名", _txtRoomName);
-        AddLoginFormRow(6, "人数", _numMaxPlayers);
+        AddLoginFormRow(4, "房间名", _txtRoomName);
+        AddLoginFormRow(5, "人数", _numMaxPlayers);
 
         _loginButtons.SuspendLayout();
         _loginButtons.Dock = DockStyle.Fill;
@@ -369,20 +392,21 @@ public class MainForm : Form
         var desiredTitle = Scaled(56, scale);
         var desiredField = Scaled(42, scale);
         var desiredBottom = Scaled(88, scale);
-        var desiredTotal = desiredTitle + desiredField * 6 + desiredBottom;
+        var desiredTotal = desiredTitle + desiredField * 5 + desiredBottom;
         if (desiredTotal > availableHeight)
         {
             var compact = availableHeight / (float)desiredTotal;
             desiredTitle = Math.Max(44, (int)Math.Floor(desiredTitle * compact));
             desiredField = Math.Max(34, (int)Math.Floor(desiredField * compact));
-            desiredBottom = Math.Max(72, availableHeight - desiredTitle - desiredField * 6);
+            desiredBottom = Math.Max(72, availableHeight - desiredTitle - desiredField * 5);
         }
 
         _loginLayout.RowStyles[0].Height = desiredTitle;
-        for (var i = 1; i < 7; i++)
+        for (var i = 1; i < 6; i++)
         {
             _loginLayout.RowStyles[i].Height = desiredField;
         }
+        _loginLayout.RowStyles[6].Height = 1;
         _loginLayout.RowStyles[7].Height = desiredBottom;
 
         if (_loginButtons.Parent is TableLayoutPanel bottom && bottom.RowStyles.Count >= 2)
@@ -455,7 +479,7 @@ public class MainForm : Form
             Padding = new Padding(12),
             BackColor = Color.FromArgb(238, 224, 184)
         };
-        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 46));
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 52));
         root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         _mainShell.Controls.Add(root);
 
@@ -471,11 +495,24 @@ public class MainForm : Form
             Spacer(16),
             _lblToken,
             Spacer(16),
+            new Label
+            {
+                Text = "房间棋子",
+                AutoSize = true,
+                TextAlign = ContentAlignment.MiddleLeft,
+                Margin = new Padding(0, 11, 4, 0),
+                ForeColor = Color.FromArgb(64, 44, 25)
+            },
+            _roomTokenCombo,
+            Button("选择棋子", SelectRoomTokenAsync),
+            Spacer(16),
             Button("刷新房间", () => SendAsync("GetRoomList")),
             Button("回到登录页", ShowLoginPage),
             Spacer(18),
+            _chkSound,
             _lblStatus
         ]);
+        _roomTokenCombo.Margin = new Padding(0, 8, 4, 0);
         root.Controls.Add(header, 0, 0);
 
         _tabs.TabPages.Add(BuildLobbyTab());
@@ -551,9 +588,9 @@ public class MainForm : Form
         side.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         side.RowStyles.Add(new RowStyle(SizeType.Absolute, 96));
         side.RowStyles.Add(new RowStyle(SizeType.Absolute, 116));
-        side.RowStyles.Add(new RowStyle(SizeType.Absolute, 188));
-        side.RowStyles.Add(new RowStyle(SizeType.Percent, 58));
-        side.RowStyles.Add(new RowStyle(SizeType.Percent, 42));
+        side.RowStyles.Add(new RowStyle(SizeType.Absolute, 212));
+        side.RowStyles.Add(new RowStyle(SizeType.Percent, 45));
+        side.RowStyles.Add(new RowStyle(SizeType.Percent, 55));
 
         side.Controls.Add(BuildTurnStatusPanel(), 0, 0);
         side.Controls.Add(BuildGameControlsPanel(), 0, 1);
@@ -569,7 +606,7 @@ public class MainForm : Form
         void ResizeGameSidePanel()
         {
             var width = Math.Max(0, sideScroll.ClientSize.Width - SystemInformation.VerticalScrollBarWidth - 2);
-            var height = Math.Max(920, sideScroll.ClientSize.Height - 2);
+            var height = Math.Max(980, sideScroll.ClientSize.Height - 2);
             side.Width = width;
             side.Height = height;
         }
@@ -732,7 +769,7 @@ public class MainForm : Form
         var propertyPage = new TabPage("地产") { BackColor = Color.FromArgb(245, 236, 207), Padding = new Padding(4) };
         var logPage = new TabPage("日志") { BackColor = Color.FromArgb(245, 236, 207), Padding = new Padding(4) };
         propertyPage.Controls.Add(_propertyGrid);
-        logPage.Controls.Add(_logList);
+        logPage.Controls.Add(_logText);
         tabs.TabPages.Add(propertyPage);
         tabs.TabPages.Add(logPage);
         return tabs;
@@ -783,6 +820,14 @@ public class MainForm : Form
         _btnRoll.Click += (_, _) => SendAsync("RollDice");
         _btnBuy.Click += (_, _) => SendAsync("BuyProperty");
         _btnEnd.Click += (_, _) => SendAsync("EndTurn");
+        _chkSound.CheckedChanged += (_, _) => _sounds.Enabled = _chkSound.Checked;
+        _roomTokenCombo.SelectedIndexChanged += (_, _) =>
+        {
+            if (!_updatingRoomTokenCombo && _currentRoomId.HasValue)
+            {
+                SelectRoomTokenAsync();
+            }
+        };
         _playerCards.Resize += (_, _) => ResizePlayerCards();
         _chatMessages.Resize += (_, _) => ResizeChatMessages();
         _txtChat.KeyDown += (_, e) =>
@@ -820,7 +865,17 @@ public class MainForm : Form
 
     private AuthRequest BuildAuthRequest()
     {
-        return new AuthRequest(_txtUser.Text.Trim(), _txtPassword.Text, SelectedToken().ImageFile);
+        return new AuthRequest(_txtUser.Text.Trim(), _txtPassword.Text);
+    }
+
+    private void SelectRoomTokenAsync()
+    {
+        if (!_currentRoomId.HasValue || _roomTokenCombo.SelectedItem is not TokenOption token)
+        {
+            return;
+        }
+
+        SendAsync("SelectToken", new SelectTokenRequest(token.ImageFile));
     }
 
     private void CreateRoomAsync()
@@ -860,6 +915,8 @@ public class MainForm : Form
                 case "LeaveRoomResult":
                     _lastGameStatus = "";
                     _currentRoomId = null;
+                    _roomTokenCombo.Enabled = false;
+                    _lblToken.Text = "棋子：进入房间后选择";
                     ClearChatMessages();
                     ShowBasic(message.ReadData<BasicResult>());
                     break;
@@ -888,10 +945,19 @@ public class MainForm : Form
                     SetStatus("轮到你行动", false);
                     break;
                 case "GameStart":
+                    _sounds.Play(GameSound.Success);
+                    break;
                 case "RentPaid":
+                    _sounds.Play(GameSound.Cost);
+                    break;
                 case "ChanceResult":
+                    _sounds.Play(GameSound.Success);
+                    break;
                 case "TaxResult":
+                    _sounds.Play(GameSound.Cost);
+                    break;
                 case "PlayerBankrupt":
+                    _sounds.Play(GameSound.Cost);
                     break;
                 case "MoveResult":
                     ApplyMove(message.ReadData<MoveResultDto>());
@@ -899,6 +965,7 @@ public class MainForm : Form
                 case "GameOver":
                     var over = message.ReadData<GameOverDto>();
                     _lastGameStatus = "";
+                    _sounds.Play(GameSound.GameOver);
                     MessageBox.Show(this, $"游戏结束，获胜者：{over.WinnerUserName}", "GameOver", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     break;
                 case "Error":
@@ -922,10 +989,10 @@ public class MainForm : Form
 
         _userId = result.UserId;
         _userName = result.UserName;
-        var token = SelectedToken();
-        _boardView.SetToken(_userId, token.ImageFile);
+        _currentTokenImageFile = "棋子-红.png";
+        _boardView.SetToken(_userId, _currentTokenImageFile);
         _lblUser.Text = $"当前玩家：{_userName} (ID {_userId})";
-        _lblToken.Text = $"棋子：{token.DisplayName}";
+        _lblToken.Text = "棋子：进入房间后选择";
         SetStatus(result.Message, false);
         ShowMainShell();
         SendAsync("GetRoomList");
@@ -952,9 +1019,12 @@ public class MainForm : Form
             : $"房间 {state.RoomId} | 状态：{state.Status}";
 
         _boardView.ApplyState(state);
+        RefreshRoomTokenOptions(state);
         RenderPlayerCards(state);
         _propertyGrid.DataSource = BuildGamePropertyRows(state);
-        _logList.DataSource = state.Logs.ToList();
+        _logText.Text = string.Join(Environment.NewLine, state.Logs);
+        _logText.SelectionStart = _logText.TextLength;
+        _logText.ScrollToCaret();
         var isMyTurn = state.Status == "Playing" && state.CurrentPlayerUserId == _userId;
         _lblActionHint.Text = state.Status != "Playing"
             ? "等待玩家准备"
@@ -962,6 +1032,41 @@ public class MainForm : Form
                 ? state.CanBuyProperty ? "轮到你行动，可购买当前位置地产" : "轮到你行动"
                 : $"等待 {state.CurrentPlayerName} 行动";
         SetGameButtons(isMyTurn, state.CanBuyProperty);
+    }
+
+    private void RefreshRoomTokenOptions(GameStateDto state)
+    {
+        var me = state.Players.FirstOrDefault(x => x.UserId == _userId);
+        var myToken = me?.TokenImageFile ?? _currentTokenImageFile;
+        var usedByOthers = state.Players
+            .Where(x => x.UserId != _userId)
+            .Select(x => x.TokenImageFile)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var options = AssetCatalog.TokenOptions
+            .Where(x => string.Equals(x.ImageFile, myToken, StringComparison.OrdinalIgnoreCase)
+                || !usedByOthers.Contains(x.ImageFile))
+            .ToList();
+        if (options.Count == 0)
+        {
+            options.Add(AssetCatalog.TokenOptions[0]);
+        }
+
+        _updatingRoomTokenCombo = true;
+        _roomTokenCombo.DataSource = options;
+        _roomTokenCombo.DisplayMember = nameof(TokenOption.DisplayName);
+        _roomTokenCombo.ValueMember = nameof(TokenOption.ImageFile);
+        _roomTokenCombo.SelectedItem = options.FirstOrDefault(x => string.Equals(x.ImageFile, myToken, StringComparison.OrdinalIgnoreCase))
+            ?? options[0];
+        _roomTokenCombo.Enabled = state.Status == "Waiting" && _currentRoomId.HasValue;
+        _updatingRoomTokenCombo = false;
+
+        var selectedToken = options.FirstOrDefault(x => string.Equals(x.ImageFile, myToken, StringComparison.OrdinalIgnoreCase));
+        if (selectedToken is not null)
+        {
+            _currentTokenImageFile = selectedToken.ImageFile;
+            _boardView.SetToken(_userId, selectedToken.ImageFile);
+            _lblToken.Text = $"棋子：{selectedToken.DisplayName}";
+        }
     }
 
     private static List<GamePropertyRow> BuildGamePropertyRows(GameStateDto state)
@@ -1007,7 +1112,7 @@ public class MainForm : Form
                     : Color.FromArgb(185, 163, 116);
         var card = new Panel
         {
-            Height = 132,
+            Height = 168,
             Width = Math.Max(280, _playerCards.ClientSize.Width - 26),
             Margin = new Padding(0, 0, 6, 8),
             Padding = new Padding(8),
@@ -1046,8 +1151,8 @@ public class MainForm : Form
         var main = new TableLayoutPanel { Dock = DockStyle.Fill, RowCount = 4, BackColor = Color.Transparent };
         main.RowStyles.Add(new RowStyle(SizeType.Absolute, 40));
         main.RowStyles.Add(new RowStyle(SizeType.Absolute, 25));
-        main.RowStyles.Add(new RowStyle(SizeType.Absolute, 25));
-        main.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        main.RowStyles.Add(new RowStyle(SizeType.Absolute, 30));
+        main.RowStyles.Add(new RowStyle(SizeType.Absolute, 54));
 
         var header = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, BackColor = Color.Transparent };
         header.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
@@ -1081,22 +1186,25 @@ public class MainForm : Form
 
         main.Controls.Add(new Label
         {
-            Text = $"地产 {player.OwnedProperties} 处 · 免租卡 {player.FreeRentCards} 张",
+            Text = player.SkipTurnRounds > 0
+                ? $"地产 {player.OwnedProperties} 处 · 免租卡 {player.FreeRentCards} 张 · 休息中"
+                : $"地产 {player.OwnedProperties} 处 · 免租卡 {player.FreeRentCards} 张",
             Dock = DockStyle.Fill,
             AutoEllipsis = true,
             TextAlign = ContentAlignment.MiddleLeft,
             ForeColor = Color.FromArgb(92, 67, 38)
         }, 0, 2);
 
-        var footer = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, BackColor = Color.Transparent };
+        var footer = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 1, BackColor = Color.Transparent };
+        footer.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 72));
         var badges = new FlowLayoutPanel
         {
             Dock = DockStyle.Fill,
             FlowDirection = FlowDirection.LeftToRight,
-            WrapContents = false,
-            BackColor = Color.Transparent
+            WrapContents = true,
+            BackColor = Color.Transparent,
+            Padding = new Padding(0, 2, 0, 0)
         };
         if (isCurrent)
         {
@@ -1110,14 +1218,11 @@ public class MainForm : Form
         {
             badges.Controls.Add(Badge("未准备", Color.FromArgb(133, 91, 58)));
         }
-        footer.Controls.Add(badges, 0, 0);
-        footer.Controls.Add(new Label
+        if (player.SkipTurnRounds > 0 && !player.IsBankrupt)
         {
-            Text = player.IsReady ? "已准备" : "等待中",
-            Dock = DockStyle.Fill,
-            TextAlign = ContentAlignment.MiddleRight,
-            ForeColor = Color.FromArgb(92, 67, 38)
-        }, 1, 0);
+            badges.Controls.Add(Badge("休息", Color.FromArgb(113, 92, 38)));
+        }
+        footer.Controls.Add(badges, 0, 0);
         main.Controls.Add(footer, 0, 3);
 
         layout.Controls.Add(main, 1, 0);
@@ -1133,8 +1238,8 @@ public class MainForm : Form
             Text = text,
             AutoSize = true,
             Height = 22,
-            Padding = new Padding(7, 3, 7, 3),
-            Margin = new Padding(4, 2, 0, 2),
+            Padding = new Padding(8, 2, 8, 2),
+            Margin = new Padding(0, 3, 6, 3),
             BackColor = color,
             ForeColor = Color.White,
             Font = new Font("Microsoft YaHei UI", 8F, FontStyle.Bold)
@@ -1186,6 +1291,7 @@ public class MainForm : Form
             return;
         }
 
+        _sounds.Play(message.MessageType == "Reaction" ? GameSound.Success : GameSound.Message);
         _chatMessages.SuspendLayout();
         while (_chatMessages.Controls.Count >= 60)
         {
@@ -1319,12 +1425,14 @@ public class MainForm : Form
     {
         _boardView.ShowDice(dice);
         _dicePicture.Image = AssetCatalog.GetImage($"{dice.Dice}.png");
+        _sounds.Play(GameSound.Dice);
         SetStatus($"{dice.UserName} 掷出 {dice.Dice} 点", false);
     }
 
     private void ApplyMove(MoveResultDto move)
     {
         _boardView.ShowMove(move);
+        _sounds.Play(GameSound.Move);
     }
 
     private void ShowBuyResult(NetMessage message)
@@ -1332,6 +1440,7 @@ public class MainForm : Form
         try
         {
             var buy = message.ReadData<BuyPropertyResultDto>();
+            _sounds.Play(buy.Success ? GameSound.Success : GameSound.Cost);
             SetStatus(buy.Message, !buy.Success);
         }
         catch
@@ -1357,11 +1466,6 @@ public class MainForm : Form
         _mainShell.Visible = false;
         _loginPage.Visible = true;
         _loginPage.BringToFront();
-    }
-
-    private TokenOption SelectedToken()
-    {
-        return _tokenCombo.SelectedItem as TokenOption ?? AssetCatalog.TokenOptions[0];
     }
 
     private void SetGameButtons(bool isMyTurn, bool canBuy = false)
@@ -1510,6 +1614,28 @@ public class MainForm : Form
         _propertyGrid.Columns.Add(GridColumn(nameof(GamePropertyRow.Price), "价", 58));
         _propertyGrid.Columns.Add(GridColumn(nameof(GamePropertyRow.Rent), "租", 58));
         _propertyGrid.Columns.Add(GridColumn(nameof(GamePropertyRow.Owner), "归属", 92, true));
+    }
+
+    private void ConfigureRoomGrid()
+    {
+        _roomGrid.AutoGenerateColumns = false;
+        _roomGrid.Columns.Clear();
+        _roomGrid.RowTemplate.Height = 32;
+        _roomGrid.ColumnHeadersHeight = 32;
+        _roomGrid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+        _roomGrid.Columns.Add(GridColumn(nameof(RoomSummaryDto.RoomId), "房间", 74));
+        _roomGrid.Columns.Add(GridColumn(nameof(RoomSummaryDto.RoomName), "名称", 180, true));
+        _roomGrid.Columns.Add(GridColumn(nameof(RoomSummaryDto.OwnerUserName), "房主", 104));
+        _roomGrid.Columns.Add(GridColumn(nameof(RoomSummaryDto.PlayerCount), "人数", 74));
+        _roomGrid.Columns.Add(GridColumn(nameof(RoomSummaryDto.MaxPlayers), "上限", 74));
+        _roomGrid.Columns.Add(GridColumn(nameof(RoomSummaryDto.ReadyCount), "准备", 74));
+        _roomGrid.Columns.Add(GridColumn(nameof(RoomSummaryDto.Status), "状态", 90));
+        foreach (DataGridViewColumn column in _roomGrid.Columns)
+        {
+            column.AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
+            column.FillWeight = column.DataPropertyName == nameof(RoomSummaryDto.RoomName) ? 210 : column.Width;
+            column.MinimumWidth = column.Width;
+        }
     }
 
     private static DataGridViewTextBoxColumn GridColumn(string propertyName, string header, int width, bool fill = false)
