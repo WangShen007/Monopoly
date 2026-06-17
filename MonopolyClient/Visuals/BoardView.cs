@@ -91,7 +91,7 @@ public class BoardView : Control
             ResolvePlayerTokenFile(move.UserId),
             path);
 
-        if (_tokenMoveAnimation is not null)
+        if (_tokenMoveAnimation is not null || _tokenMoveQueue.Count > 0 || IsDiceAnimationInProgress())
         {
             _tokenMoveQueue.Enqueue(animation);
         }
@@ -213,7 +213,7 @@ public class BoardView : Control
     private void DrawCells(Graphics graphics, Rectangle board, GameStateDto state)
     {
         var cellsByIndex = state.MapCells.ToDictionary(x => x.CellIndex);
-        var movingUserId = _tokenMoveAnimation?.UserId;
+        var movingUserId = GetDisplayedMovingUserId();
         foreach (var fallback in AssetCatalog.DefaultBoard)
         {
             cellsByIndex.TryGetValue(fallback.Index, out var cell);
@@ -575,24 +575,39 @@ public class BoardView : Control
         _tokenMoveAnimation = animation;
         _tokenMoveTimer.Stop();
         _tokenMoveTimer.Start();
+        Invalidate();
     }
 
     private void StartNextQueuedTokenMoveOrStop()
     {
+        _tokenMoveTimer.Stop();
+        _tokenMoveAnimation = null;
+
+        if (IsDiceAnimationInProgress())
+        {
+            Invalidate();
+            return;
+        }
+
         if (_tokenMoveQueue.Count > 0)
         {
             StartTokenMoveAnimation(_tokenMoveQueue.Dequeue());
             return;
         }
-
-        _tokenMoveTimer.Stop();
-        _tokenMoveAnimation = null;
     }
 
     private void DrawMovingPlayer(Graphics graphics, Rectangle board)
     {
         if (_tokenMoveAnimation is null)
         {
+            if (!IsDiceAnimationInProgress() || _tokenMoveQueue.Count == 0)
+            {
+                return;
+            }
+
+            var pending = _tokenMoveQueue.Peek();
+            var pendingRect = GetAnimatedTokenRect(board, pending.Path[0], pending.UserId);
+            DrawToken(graphics, pendingRect, pending.TokenImageFile, false);
             return;
         }
 
@@ -791,9 +806,30 @@ public class BoardView : Control
         if (progress >= 1F)
         {
             _diceTimer.Stop();
+            if (_tokenMoveAnimation is null && _tokenMoveQueue.Count > 0)
+            {
+                StartNextQueuedTokenMoveOrStop();
+            }
         }
 
         Invalidate();
+    }
+
+    private bool IsDiceAnimationInProgress()
+    {
+        return _diceDisplay is not null && _diceTimer.Enabled;
+    }
+
+    private int? GetDisplayedMovingUserId()
+    {
+        if (_tokenMoveAnimation is not null)
+        {
+            return _tokenMoveAnimation.Value.UserId;
+        }
+
+        return IsDiceAnimationInProgress() && _tokenMoveQueue.Count > 0
+            ? _tokenMoveQueue.Peek().UserId
+            : null;
     }
 
     private void DrawDiceDisplay(Graphics graphics, Rectangle center)
