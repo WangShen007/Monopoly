@@ -806,7 +806,7 @@ public class BoardView : Control
         var display = _diceDisplay.Value;
         var eased = EaseOutCubic(display.Progress);
         var panelWidth = Math.Min(center.Width - 28, Math.Max(260, Math.Min(310, (int)Math.Round(center.Width * 0.68))));
-        var panelHeight = Math.Min(center.Height - 28, Math.Max(270, Math.Min(330, (int)Math.Round(center.Height * 0.74))));
+        var panelHeight = Math.Min(center.Height - 18, Math.Max(290, Math.Min(350, (int)Math.Round(center.Height * 0.78))));
         var panel = CenteredRectangle(center, panelWidth, panelHeight);
         var shadow = panel;
         shadow.Offset(0, 5);
@@ -823,19 +823,21 @@ public class BoardView : Control
         using var darkBrush = new SolidBrush(Color.FromArgb(72, 45, 25));
         using var accentBrush = new SolidBrush(Color.FromArgb(125, 51, 27));
 
-        var titleRect = new Rectangle(panel.Left + 10, panel.Top + 8, panel.Width - 20, 24);
-        var valueRect = new Rectangle(panel.Left + 10, panel.Bottom - 32, panel.Width - 20, 24);
+        var titleRect = new Rectangle(panel.Left + 14, panel.Top + 8, panel.Width - 28, 28);
+        var valueRect = new Rectangle(panel.Left + 14, panel.Bottom - 40, panel.Width - 28, 32);
         graphics.DrawString($"{display.UserName} 掷出", titleFont, darkBrush, titleRect, CenterFormat());
         graphics.DrawString($"{display.DisplayValue} 点", valueFont, accentBrush, valueRect, CenterFormat());
 
+        var diceTop = titleRect.Bottom + 8;
+        var diceBottom = valueRect.Top - 10;
         var diceSize = Math.Min(
-            270,
+            250,
             Math.Max(
-                210,
-                Math.Min(panel.Width - 22, panel.Height - 54)));
+                190,
+                Math.Min(panel.Width - 32, diceBottom - diceTop)));
         var diceRect = new Rectangle(
             panel.Left + (panel.Width - diceSize) / 2,
-            panel.Top + 30,
+            diceTop + Math.Max(0, (diceBottom - diceTop - diceSize) / 2),
             diceSize,
             diceSize);
         DrawAnimatedDice(graphics, diceRect, display.DisplayValue, eased);

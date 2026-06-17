@@ -42,6 +42,7 @@ public record JoinRoomRequest(int RoomId);
 public record EntityIdRequest(int Id);
 public record ChatRequest(string Text);
 public record ReactionRequest(string ReactionType);
+public record SelectTokenRequest(string TokenImageFile);
 
 public record RoomSummaryDto(
     int RoomId,
@@ -50,7 +51,8 @@ public record RoomSummaryDto(
     int MaxPlayers,
     string Status,
     int PlayerCount,
-    int ReadyCount);
+    int ReadyCount,
+    List<string>? UsedTokenImageFiles = null);
 
 public record RoomListResult(List<RoomSummaryDto> Rooms);
 
@@ -91,6 +93,7 @@ public record PlayerStateDto(
     bool IsReady,
     int OwnedProperties,
     int FreeRentCards,
+    int SkipTurnRounds,
     string TokenImageFile = "棋子-红.png");
 
 public record PropertyStateDto(

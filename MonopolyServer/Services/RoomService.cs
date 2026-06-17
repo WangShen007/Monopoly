@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using MonopolyModels.Data;
 using MonopolyModels.Dtos;
+using MonopolyModels.Entities;
 using MonopolyModels.States;
 
 namespace MonopolyServer.Services;
@@ -36,6 +37,35 @@ public class RoomService
                 .OrderByDescending(x => x.CreatedAt)
                 .Select(ToSummary)
                 .ToList();
+        }
+    }
+
+    public GameRoom SelectToken(ClientUser user, string tokenImageFile)
+    {
+        if (!user.IsLoggedIn)
+        {
+            throw new InvalidOperationException("请先登录");
+        }
+
+        var normalized = NormalizeTokenImageFile(tokenImageFile);
+        var room = RequireRoom(user);
+        lock (room.Gate)
+        {
+            if (room.Status != "Waiting")
+            {
+                throw new InvalidOperationException("游戏已经开始，不能更换棋子");
+            }
+
+            if (room.PlayerStates.Any(x => x.UserId != user.UserId && string.Equals(x.TokenImageFile, normalized, StringComparison.OrdinalIgnoreCase)))
+            {
+                throw new InvalidOperationException("这个棋子已经被别人选了");
+            }
+
+            var state = room.PlayerStates.First(x => x.UserId == user.UserId);
+            state.TokenImageFile = normalized;
+            user.TokenImageFile = normalized;
+            AddLog(room, $"{user.UserName} 选择了 {normalized}");
+            return room;
         }
     }
 
@@ -309,6 +339,7 @@ public class RoomService
                     x.IsReady,
                     room.PropertyStates.Count(p => p.OwnerUserId == x.UserId),
                     x.FreeRentCards,
+                    x.SkipTurnRounds,
                     x.TokenImageFile)).ToList(),
                 room.Logs.TakeLast(80).ToList(),
                 canBuy);
@@ -340,6 +371,7 @@ public class RoomService
             player.Position = 0;
             player.IsBankrupt = false;
             player.FreeRentCards = 0;
+            player.SkipTurnRounds = 0;
         }
 
         room.Status = "Playing";
@@ -377,10 +409,20 @@ public class RoomService
             case "Property":
                 ResolvePropertyLocked(room, player, cell.Id);
                 break;
+            case "Empty":
+                ApplyRestCellLocked(room, player, cell);
+                break;
             default:
                 AddLog(room, $"{player.UserName} 来到 {cell.CellName}，无事发生");
                 break;
         }
+    }
+
+    private void ApplyRestCellLocked(GameRoom room, PlayerState player, MapCell cell)
+    {
+        player.SkipTurnRounds = Math.Max(player.SkipTurnRounds, 1);
+        AddAction(room, player.UserId, "Rest", $"{player.UserName} 来到 {cell.CellName}，下回合休息一轮");
+        AddLog(room, $"{player.UserName} 来到 {cell.CellName}，下回合休息一轮");
     }
 
     private void ResolvePropertyLocked(GameRoom room, PlayerState player, int mapCellId)
@@ -465,6 +507,7 @@ public class RoomService
                 passedStart,
                 player.Money,
                 isBackward));
+            ResolveCurrentCellLocked(room, player, passedStart || string.Equals(card.EventType, "GoToStart", StringComparison.OrdinalIgnoreCase));
         }
     }
 
@@ -550,6 +593,38 @@ public class RoomService
             guard += 1;
         } while (room.PlayerStates[room.CurrentPlayerIndex].IsBankrupt && guard <= room.PlayerStates.Count);
 
+        guard = 0;
+        while (guard < room.PlayerStates.Count)
+        {
+            var current = room.PlayerStates[room.CurrentPlayerIndex];
+            if (current.IsBankrupt)
+            {
+                room.CurrentPlayerIndex = (room.CurrentPlayerIndex + 1) % room.PlayerStates.Count;
+                if (room.CurrentPlayerIndex == 0)
+                {
+                    room.RoundNumber += 1;
+                }
+
+                guard += 1;
+                continue;
+            }
+
+            if (current.SkipTurnRounds <= 0)
+            {
+                break;
+            }
+
+            current.SkipTurnRounds -= 1;
+            AddLog(room, $"{current.UserName} 正在休息，自动跳过本回合");
+            room.CurrentPlayerIndex = (room.CurrentPlayerIndex + 1) % room.PlayerStates.Count;
+            if (room.CurrentPlayerIndex == 0)
+            {
+                room.RoundNumber += 1;
+            }
+
+            guard += 1;
+        }
+
         room.CurrentPlayerRolled = false;
         AddLog(room, $"轮到 {GetCurrentPlayerLocked(room).UserName}");
     }
@@ -587,6 +662,7 @@ public class RoomService
 
     private static void AddPlayerLocked(GameRoom room, ClientUser user)
     {
+        user.TokenImageFile = FirstAvailableToken(room, user.TokenImageFile);
         user.RoomId = room.RoomId;
         room.Players.Add(user);
         room.PlayerStates.Add(new PlayerState
@@ -595,8 +671,25 @@ public class RoomService
             UserName = user.UserName,
             Position = 0,
             Money = GameRules.InitialMoney,
+            SkipTurnRounds = 0,
             TokenImageFile = user.TokenImageFile
         });
+    }
+
+    private static string FirstAvailableToken(GameRoom room, string preferredToken)
+    {
+        var normalizedPreferred = NormalizeTokenImageFile(preferredToken);
+        var used = room.PlayerStates
+            .Select(x => x.TokenImageFile)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (!used.Contains(normalizedPreferred))
+        {
+            return normalizedPreferred;
+        }
+
+        return new[] { "棋子-红.png", "棋子-黄.png", "棋子-蓝.png", "棋子-绿.png" }
+            .FirstOrDefault(x => !used.Contains(x))
+            ?? normalizedPreferred;
     }
 
     private static RoomSummaryDto ToSummary(GameRoom room)
@@ -610,8 +703,32 @@ public class RoomService
                 room.MaxPlayers,
                 room.Status,
                 room.Players.Count,
-                room.PlayerStates.Count(x => x.IsReady));
+                room.PlayerStates.Count(x => x.IsReady),
+                room.PlayerStates
+                    .Select(x => x.TokenImageFile)
+                    .Where(x => !string.IsNullOrWhiteSpace(x))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList());
         }
+    }
+
+    private static string NormalizeTokenImageFile(string? tokenImageFile)
+    {
+        var allowed = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "棋子-红.png",
+            "棋子-黄.png",
+            "棋子-蓝.png",
+            "棋子-绿.png"
+        };
+
+        if (string.IsNullOrWhiteSpace(tokenImageFile))
+        {
+            return "棋子-红.png";
+        }
+
+        var fileName = Path.GetFileName(tokenImageFile.Trim());
+        return allowed.Contains(fileName) ? fileName : "棋子-红.png";
     }
 
     private static void AddLog(GameRoom room, string text)

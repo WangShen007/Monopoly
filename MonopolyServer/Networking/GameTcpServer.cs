@@ -101,6 +101,9 @@ public class GameTcpServer
                 case "JoinRoom":
                     await JoinRoomAsync(user, message.ReadData<JoinRoomRequest>());
                     break;
+                case "SelectToken":
+                    await SelectTokenAsync(user, message.ReadData<SelectTokenRequest>());
+                    break;
                 case "LeaveRoom":
                     await LeaveRoomAsync(user);
                     break;
@@ -330,6 +333,14 @@ public class GameTcpServer
     {
         var room = _roomService.JoinRoom(user, request.RoomId);
         await user.SendAsync(NetMessage.Create("JoinRoomResult", new BasicResult(true, "加入房间成功")));
+        await BroadcastRoomListAsync();
+        await BroadcastGameStateAsync(room);
+    }
+
+    private async Task SelectTokenAsync(ClientUser user, SelectTokenRequest request)
+    {
+        var room = _roomService.SelectToken(user, request.TokenImageFile);
+        await user.SendAsync(NetMessage.Create("SelectTokenResult", new BasicResult(true, "棋子选择成功")));
         await BroadcastRoomListAsync();
         await BroadcastGameStateAsync(room);
     }
