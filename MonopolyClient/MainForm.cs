@@ -10,17 +10,17 @@ public class MainForm : Form
     private readonly GameTcpClient _client = new();
     private readonly Panel _loginPage = new() { Dock = DockStyle.Fill };
     private readonly Panel _mainShell = new() { Dock = DockStyle.Fill, Visible = false };
-    private readonly Panel _loginCard = new();
+    private readonly TranslucentPanel _loginCard = new();
     private readonly TableLayoutPanel _loginLayout = new();
     private readonly TableLayoutPanel _loginButtons = new();
     private float _lastLoginScale = -1f;
     private Rectangle _lastLoginBounds = Rectangle.Empty;
-    private readonly TextBox _txtIp = new() { Text = "127.0.0.1", Width = 190 };
-    private readonly NumericUpDown _numPort = new() { Minimum = 1, Maximum = 65535, Value = 9000, Width = 95 };
-    private readonly TextBox _txtUser = new() { Text = "player1", Width = 260 };
-    private readonly TextBox _txtPassword = new() { Text = "123456", Width = 260, UseSystemPasswordChar = true };
-    private readonly ComboBox _roomTokenCombo = new() { Width = 160, DropDownStyle = ComboBoxStyle.DropDownList };
-    private readonly Label _lblLoginStatus = new() { AutoSize = false, Height = 28, Text = "请先连接服务器", TextAlign = ContentAlignment.MiddleCenter };
+    private readonly TextBox _txtIp = new() { Text = "127.0.0.1", Width = 220 };
+    private readonly NumericUpDown _numPort = new() { Minimum = 1, Maximum = 65535, Value = 9000, Width = 110 };
+    private readonly TextBox _txtUser = new() { Text = "player1", Width = 320 };
+    private readonly TextBox _txtPassword = new() { Text = "123456", Width = 320, UseSystemPasswordChar = true };
+    private readonly ComboBox _roomTokenCombo = new() { Width = 150, DropDownStyle = ComboBoxStyle.DropDownList };
+    private readonly Label _lblLoginStatus = new() { AutoSize = false, Height = 34, Text = "请先连接服务器", TextAlign = ContentAlignment.MiddleCenter };
     private readonly Label _lblStatus = new() { AutoSize = true, Text = "未连接" };
     private readonly Label _lblUser = new() { AutoSize = true, Text = "未登录" };
     private readonly Label _lblToken = new() { AutoSize = true, Text = "棋子：-" };
@@ -173,9 +173,11 @@ public class MainForm : Form
         EnableDoubleBuffering(_loginCard);
         _loginPage.Resize += (_, _) => CenterLoginCard();
 
-        _loginCard.BackColor = Color.FromArgb(242, 219, 165);
+        _loginCard.BackColor = Color.Transparent;
+        _loginCard.FillColor = Color.Transparent;
+        _loginCard.BorderColor = Color.Transparent;
         _loginCard.Margin = Padding.Empty;
-        _loginCard.BorderStyle = BorderStyle.FixedSingle;
+        _loginCard.BorderStyle = BorderStyle.None;
 
         _loginLayout.SuspendLayout();
         _loginLayout.Dock = DockStyle.Fill;
@@ -185,29 +187,16 @@ public class MainForm : Form
         _loginLayout.Margin = Padding.Empty;
         _loginLayout.Padding = Padding.Empty;
         _loginLayout.ColumnStyles.Clear();
-        _loginLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 132));
+        _loginLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 190));
         _loginLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         _loginLayout.RowStyles.Clear();
-        _loginLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 52));
+        _loginLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 42));
         for (var i = 1; i < 7; i++)
         {
-            _loginLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 40));
+            _loginLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 48));
         }
-        _loginLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 86));
+        _loginLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 108));
         _loginLayout.ResumeLayout(false);
-
-        var title = new Label
-        {
-            Text = "玩家通行证",
-            Dock = DockStyle.Fill,
-            TextAlign = ContentAlignment.MiddleCenter,
-            Font = new Font("Microsoft YaHei UI", 20F, FontStyle.Bold),
-            ForeColor = Color.FromArgb(91, 45, 19),
-            Margin = Padding.Empty,
-            Tag = "title"
-        };
-        _loginLayout.Controls.Add(title, 0, 0);
-        _loginLayout.SetColumnSpan(title, 2);
 
         AddLoginFormRow(1, "服务器", BuildServerRow());
         AddLoginFormRow(2, "玩家名 / ID", _txtUser);
@@ -221,7 +210,7 @@ public class MainForm : Form
         _loginButtons.RowCount = 1;
         _loginButtons.BackColor = Color.Transparent;
         _loginButtons.Margin = Padding.Empty;
-        _loginButtons.Padding = new Padding(0, 10, 0, 0);
+        _loginButtons.Padding = new Padding(0, 12, 0, 0);
         _loginButtons.Controls.Clear();
         _loginButtons.ColumnStyles.Clear();
         _loginButtons.RowStyles.Clear();
@@ -235,7 +224,7 @@ public class MainForm : Form
         {
             Button("连接", ConnectAsync),
             Button("注册", RegisterAsync),
-            Button("登录进入大厅", LoginAsync)
+            Button("进入大厅", LoginAsync)
         };
         for (var i = 0; i < loginActionButtons.Length; i++)
         {
@@ -259,7 +248,7 @@ public class MainForm : Form
             Padding = Padding.Empty,
             Tag = "bottom"
         };
-        bottom.RowStyles.Add(new RowStyle(SizeType.Absolute, 60));
+        bottom.RowStyles.Add(new RowStyle(SizeType.Absolute, 68));
         bottom.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         bottom.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         bottom.Controls.Add(_loginButtons, 0, 0);
@@ -291,10 +280,10 @@ public class MainForm : Form
         PrepareLoginInput(_numPort);
         _txtIp.Dock = DockStyle.Fill;
         _numPort.Dock = DockStyle.Fill;
-        _txtIp.Margin = new Padding(0, 0, 6, 0);
-        _numPort.Margin = new Padding(6, 0, 0, 0);
-        _txtIp.MinimumSize = new Size(0, 24);
-        _numPort.MinimumSize = new Size(0, 24);
+        _txtIp.Margin = new Padding(0, 4, 8, 4);
+        _numPort.Margin = new Padding(8, 4, 0, 4);
+        _txtIp.MinimumSize = new Size(0, 32);
+        _numPort.MinimumSize = new Size(0, 32);
         row.Controls.Add(_txtIp, 0, 0);
         row.Controls.Add(_numPort, 1, 0);
         return row;
@@ -315,23 +304,29 @@ public class MainForm : Form
 
         PrepareLoginInput(input);
         input.Dock = DockStyle.Fill;
-        input.Margin = new Padding(8, 4, 0, 4);
+        input.Margin = new Padding(12, 5, 0, 5);
         _loginLayout.Controls.Add(input, 1, rowIndex);
     }
 
     private static void PrepareLoginInput(Control control)
     {
-        control.Margin = new Padding(8, 8, 0, 8);
+        control.Margin = new Padding(12, 7, 0, 7);
         control.BackColor = Color.FromArgb(255, 251, 235);
         control.ForeColor = Color.FromArgb(68, 44, 18);
         control.Tag = "input";
         if (control is TextBox textBox)
         {
             textBox.BorderStyle = BorderStyle.FixedSingle;
+            textBox.MinimumSize = new Size(0, 32);
         }
         else if (control is ComboBox comboBox)
         {
             comboBox.FlatStyle = FlatStyle.Flat;
+            comboBox.MinimumSize = new Size(0, 32);
+        }
+        else if (control is NumericUpDown numeric)
+        {
+            numeric.MinimumSize = new Size(0, 32);
         }
     }
 
@@ -339,7 +334,9 @@ public class MainForm : Form
     {
         button.Dock = DockStyle.Fill;
         button.Margin = new Padding(5, 4, 5, 4);
-        button.MinimumSize = new Size(0, 32);
+        button.MinimumSize = new Size(0, 38);
+        button.AutoSize = false;
+        button.Padding = new Padding(2, 0, 2, 0);
         button.FlatStyle = FlatStyle.Flat;
         button.FlatAppearance.BorderSize = 0;
         button.BackColor = Color.FromArgb(135, 82, 37);
@@ -356,11 +353,11 @@ public class MainForm : Form
             return;
         }
 
-        var scale = Math.Clamp(Math.Min(clientSize.Width / 1240f, clientSize.Height / 820f), 0.78f, 1.24f);
-        var cardWidth = Scaled(520, scale);
-        var cardHeight = Scaled(430, scale);
-        cardWidth = Math.Min(cardWidth, Math.Max(320, clientSize.Width - 48));
-        cardHeight = Math.Min(Math.Max(cardHeight, 360), Math.Max(320, clientSize.Height - 48));
+        var scale = Math.Clamp(Math.Min(clientSize.Width / 1240f, clientSize.Height / 820f), 0.78f, 1.18f);
+        var cardWidth = Scaled(680, scale);
+        var cardHeight = Scaled(500, scale);
+        cardWidth = Math.Min(cardWidth, Math.Max(380, clientSize.Width - 56));
+        cardHeight = Math.Min(Math.Max(cardHeight, 420), Math.Max(360, clientSize.Height - 56));
         var bounds = new Rectangle(
             Math.Max(24, (clientSize.Width - cardWidth) / 2),
             Math.Max(24, (clientSize.Height - cardHeight) / 2),
@@ -377,7 +374,7 @@ public class MainForm : Form
         _loginPage.SuspendLayout();
         _loginCard.SuspendLayout();
         _loginCard.Bounds = bounds;
-        _loginCard.Padding = new Padding(Scaled(26, scale), Scaled(24, scale), Scaled(26, scale), Scaled(20, scale));
+        _loginCard.Padding = new Padding(Scaled(34, scale), Scaled(24, scale), Scaled(34, scale), Scaled(24, scale));
         UpdateLoginLayoutMetrics(scale);
         ApplyLoginFonts(_loginCard, scale);
         _loginCard.ResumeLayout(true);
@@ -386,19 +383,19 @@ public class MainForm : Form
 
     private void UpdateLoginLayoutMetrics(float scale)
     {
-        _loginLayout.ColumnStyles[0].Width = Scaled(132, scale);
+        _loginLayout.ColumnStyles[0].Width = Scaled(190, scale);
 
-        var availableHeight = Math.Max(260, _loginCard.ClientSize.Height - _loginCard.Padding.Vertical);
-        var desiredTitle = Scaled(56, scale);
-        var desiredField = Scaled(42, scale);
-        var desiredBottom = Scaled(88, scale);
+        var availableHeight = Math.Max(330, _loginCard.ClientSize.Height - _loginCard.Padding.Vertical);
+        var desiredTitle = Scaled(44, scale);
+        var desiredField = Scaled(52, scale);
+        var desiredBottom = Scaled(118, scale);
         var desiredTotal = desiredTitle + desiredField * 5 + desiredBottom;
         if (desiredTotal > availableHeight)
         {
             var compact = availableHeight / (float)desiredTotal;
-            desiredTitle = Math.Max(44, (int)Math.Floor(desiredTitle * compact));
-            desiredField = Math.Max(34, (int)Math.Floor(desiredField * compact));
-            desiredBottom = Math.Max(72, availableHeight - desiredTitle - desiredField * 5);
+            desiredTitle = Math.Max(30, (int)Math.Floor(desiredTitle * compact));
+            desiredField = Math.Max(42, (int)Math.Floor(desiredField * compact));
+            desiredBottom = Math.Max(88, availableHeight - desiredTitle - desiredField * 5);
         }
 
         _loginLayout.RowStyles[0].Height = desiredTitle;
@@ -411,43 +408,43 @@ public class MainForm : Form
 
         if (_loginButtons.Parent is TableLayoutPanel bottom && bottom.RowStyles.Count >= 2)
         {
-            bottom.RowStyles[0].Height = Math.Max(46, Math.Min(Scaled(56, scale), desiredBottom - 26));
+            bottom.RowStyles[0].Height = Math.Max(56, Math.Min(Scaled(66, scale), desiredBottom - 30));
         }
 
-        var buttonTopPadding = Math.Max(4, Math.Min(Scaled(8, scale), desiredBottom / 10));
+        var buttonTopPadding = Math.Max(5, Math.Min(Scaled(10, scale), desiredBottom / 10));
         _loginButtons.Padding = new Padding(0, buttonTopPadding, 0, 0);
-        _lblLoginStatus.Margin = new Padding(0, Math.Max(3, Scaled(5, scale)), 0, 0);
+        _lblLoginStatus.Margin = new Padding(0, Math.Max(4, Scaled(6, scale)), 0, 0);
         foreach (Control button in _loginButtons.Controls)
         {
-            button.Margin = new Padding(Scaled(5, scale), Scaled(3, scale), Scaled(5, scale), Scaled(3, scale));
+            button.Margin = new Padding(Scaled(6, scale), Scaled(4, scale), Scaled(6, scale), Scaled(4, scale));
         }
     }
 
     private static void ApplyLoginFonts(Control parent, float scale)
     {
-        var fontScale = Math.Clamp(scale, 0.84f, 1.18f);
+        var fontScale = Math.Clamp(scale, 0.88f, 1.16f);
         foreach (Control control in parent.Controls)
         {
             var role = control.Tag as string;
             if (role == "title")
             {
-                control.Font = new Font("Microsoft YaHei UI", 20F * fontScale, FontStyle.Bold);
+                control.Font = new Font("Microsoft YaHei UI", 23F * fontScale, FontStyle.Bold);
             }
             else if (role == "label")
             {
-                control.Font = new Font("Microsoft YaHei UI", 9.7F * fontScale, FontStyle.Bold);
+                control.Font = new Font("Microsoft YaHei UI", 11.5F * fontScale, FontStyle.Bold);
             }
             else if (role == "button" || control is Button)
             {
-                control.Font = new Font("Microsoft YaHei UI", 10F * fontScale, FontStyle.Bold);
+                control.Font = new Font("Microsoft YaHei UI", 10.8F * fontScale, FontStyle.Bold);
             }
             else if (role == "status")
             {
-                control.Font = new Font("Microsoft YaHei UI", 9.3F * fontScale, FontStyle.Regular);
+                control.Font = new Font("Microsoft YaHei UI", 10.5F * fontScale, FontStyle.Regular);
             }
             else if (role == "input" || control is TextBox or ComboBox or NumericUpDown)
             {
-                control.Font = new Font("Microsoft YaHei UI", 9.5F * fontScale, FontStyle.Regular);
+                control.Font = new Font("Microsoft YaHei UI", 11F * fontScale, FontStyle.Regular);
             }
 
             if (control.HasChildren)
@@ -479,42 +476,87 @@ public class MainForm : Form
             Padding = new Padding(12),
             BackColor = Color.FromArgb(238, 224, 184)
         };
-        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 52));
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 134));
         root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         _mainShell.Controls.Add(root);
 
-        var header = new FlowLayoutPanel
+        var header = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            RowCount = 2,
+            BackColor = Color.FromArgb(238, 224, 184),
+            Margin = Padding.Empty,
+            Padding = new Padding(0, 0, 0, 4)
+        };
+        header.RowStyles.Add(new RowStyle(SizeType.Absolute, 62));
+        header.RowStyles.Add(new RowStyle(SizeType.Absolute, 62));
+
+        var identityRow = new FlowLayoutPanel
         {
             Dock = DockStyle.Fill,
             FlowDirection = FlowDirection.LeftToRight,
             WrapContents = false,
-            BackColor = Color.FromArgb(238, 224, 184)
+            BackColor = Color.Transparent,
+            Margin = Padding.Empty,
+            Padding = new Padding(0, 2, 0, 0)
         };
-        header.Controls.AddRange([
+        var actionRow = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            FlowDirection = FlowDirection.LeftToRight,
+            WrapContents = false,
+            BackColor = Color.Transparent,
+            Margin = Padding.Empty,
+            Padding = new Padding(0, 0, 0, 0)
+        };
+
+        var headerFont = new Font("Microsoft YaHei UI", 12F, FontStyle.Bold);
+        var headerStrongFont = new Font("Microsoft YaHei UI", 12F, FontStyle.Bold);
+        _lblUser.Font = headerFont;
+        _lblToken.Font = headerFont;
+        _lblStatus.Font = headerFont;
+        _chkSound.Font = headerFont;
+        _roomTokenCombo.Font = new Font("Microsoft YaHei UI", 11.5F, FontStyle.Regular);
+        _roomTokenCombo.Width = 166;
+
+        identityRow.Controls.AddRange([
             _lblUser,
-            Spacer(16),
+            Spacer(34),
             _lblToken,
-            Spacer(16),
+            Spacer(38),
             new Label
             {
                 Text = "房间棋子",
                 AutoSize = true,
                 TextAlign = ContentAlignment.MiddleLeft,
-                Margin = new Padding(0, 11, 4, 0),
+                Margin = new Padding(0, 18, 6, 0),
+                Font = headerStrongFont,
                 ForeColor = Color.FromArgb(64, 44, 25)
             },
             _roomTokenCombo,
             Button("选择棋子", SelectRoomTokenAsync),
-            Spacer(16),
-            Button("刷新房间", () => SendAsync("GetRoomList")),
-            Button("回到登录页", ShowLoginPage),
-            Spacer(18),
+            Spacer(28),
             _chkSound,
+            Spacer(22),
             _lblStatus
         ]);
-        _roomTokenCombo.Margin = new Padding(0, 8, 4, 0);
+        actionRow.Controls.AddRange([
+            Button("刷新房间", () => SendAsync("GetRoomList")),
+            Button("回到登录页", ShowLoginPage)
+        ]);
+        _roomTokenCombo.Margin = new Padding(0, 12, 12, 0);
+        _chkSound.Margin = new Padding(2, 17, 10, 0);
+        _lblUser.Margin = new Padding(0, 18, 0, 0);
+        _lblToken.Margin = new Padding(0, 18, 0, 0);
+        _lblStatus.Margin = new Padding(8, 18, 0, 0);
+        header.Controls.Add(identityRow, 0, 0);
+        header.Controls.Add(actionRow, 0, 1);
         root.Controls.Add(header, 0, 0);
 
+        _tabs.Font = new Font("Microsoft YaHei UI", 12F, FontStyle.Bold);
+        _tabs.ItemSize = new Size(230, 44);
+        _tabs.SizeMode = TabSizeMode.Fixed;
         _tabs.TabPages.Add(BuildLobbyTab());
         _tabs.TabPages.Add(BuildGameTab());
         _tabs.TabPages.Add(BuildManageTab());
@@ -525,26 +567,72 @@ public class MainForm : Form
     private TabPage BuildLobbyTab()
     {
         var page = Page("房间大厅");
-        var layout = Split();
+        var layout = Split(0.78f);
         page.Controls.Add(layout);
 
-        var left = new TableLayoutPanel { Dock = DockStyle.Fill, RowCount = 2 };
-        left.RowStyles.Add(new RowStyle(SizeType.Absolute, 48));
-        left.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        var toolbar = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = false };
+        var left = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            RowCount = 2,
+            BackColor = Color.FromArgb(245, 236, 207),
+            Padding = new Padding(12)
+        };
+        left.RowStyles.Add(new RowStyle(SizeType.Absolute, 170));
+        left.RowStyles.Add(new RowStyle(SizeType.Percent, 68));
+
+        var roomActions = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            RowCount = 2,
+            ColumnCount = 1,
+            BackColor = Color.FromArgb(252, 248, 235),
+            Padding = new Padding(16, 12, 16, 10),
+            Margin = new Padding(0, 0, 0, 10)
+        };
+        roomActions.RowStyles.Add(new RowStyle(SizeType.Absolute, 62));
+        roomActions.RowStyles.Add(new RowStyle(SizeType.Absolute, 66));
+        var lobbyHint = new Label
+        {
+            Dock = DockStyle.Fill,
+            Text = "选择房间后加入，房主可准备开局。",
+            TextAlign = ContentAlignment.MiddleLeft,
+            Font = new Font("Microsoft YaHei UI", 15F, FontStyle.Bold),
+            ForeColor = Color.FromArgb(92, 67, 38),
+            AutoEllipsis = true
+        };
+        var toolbar = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            FlowDirection = FlowDirection.LeftToRight,
+            WrapContents = false,
+            BackColor = Color.Transparent,
+            Margin = Padding.Empty,
+            Padding = Padding.Empty
+        };
         toolbar.Controls.AddRange([
             Button("创建房间", CreateRoomAsync),
             Button("加入选中", JoinRoomAsync),
             Button("离开房间", () => SendAsync("LeaveRoom")),
             Button("准备", () => SendAsync("Ready"))
         ]);
-        left.Controls.Add(toolbar, 0, 0);
-        left.Controls.Add(_roomGrid, 0, 1);
+        roomActions.Controls.Add(lobbyHint, 0, 0);
+        roomActions.Controls.Add(toolbar, 0, 1);
+
+        var roomListPanel = new Panel
+        {
+            Dock = DockStyle.Fill,
+            BackColor = Color.FromArgb(252, 248, 235),
+            Padding = new Padding(0)
+        };
+        roomListPanel.Controls.Add(_roomGrid);
+        left.Controls.Add(roomActions, 0, 0);
+        left.Controls.Add(roomListPanel, 0, 1);
         layout.Panel1.Controls.Add(left);
 
         var preview = new Panel
         {
             Dock = DockStyle.Fill,
+            Padding = new Padding(8),
             BackgroundImage = AssetCatalog.GetImage("棋盘中间.png"),
             BackgroundImageLayout = ImageLayout.Zoom,
             BackColor = Color.FromArgb(33, 67, 49)
@@ -803,7 +891,7 @@ public class MainForm : Form
         var layout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 2 };
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
-        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 48));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 60));
         layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         var buttons = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = false };
         buttons.Controls.AddRange([Button("刷新排行榜", () => SendAsync("GetRankList")), Button("刷新历史", () => SendAsync("GetHistory"))]);
@@ -1576,14 +1664,30 @@ public class MainForm : Form
         return new TabPage(title) { BackColor = Color.FromArgb(238, 224, 184), Padding = new Padding(10) };
     }
 
-    private static SplitContainer Split()
+    private static SplitContainer Split(float leftRatio = 0.74f)
     {
-        return new SplitContainer
+        const int minLeftWidth = 520;
+        const int minRightWidth = 260;
+        var split = new SplitContainer
         {
             Dock = DockStyle.Fill,
-            SplitterDistance = 760,
+            FixedPanel = FixedPanel.Panel2,
             BackColor = Color.Transparent
         };
+        split.SizeChanged += (_, _) =>
+        {
+            var width = split.ClientSize.Width;
+            if (width <= minLeftWidth + minRightWidth)
+            {
+                return;
+            }
+
+            split.SplitterDistance = Math.Clamp(
+                (int)Math.Round(width * leftRatio),
+                minLeftWidth,
+                Math.Max(minLeftWidth, width - minRightWidth));
+        };
+        return split;
     }
 
     private static GroupBox Group(string title, Control content)
@@ -1605,8 +1709,8 @@ public class MainForm : Form
     {
         _propertyGrid.AutoGenerateColumns = false;
         _propertyGrid.Columns.Clear();
-        _propertyGrid.RowTemplate.Height = 32;
-        _propertyGrid.ColumnHeadersHeight = 32;
+        _propertyGrid.RowTemplate.Height = 38;
+        _propertyGrid.ColumnHeadersHeight = 40;
         _propertyGrid.AutoSizeRowsMode = DataGridViewAutoSizeRowsMode.None;
         _propertyGrid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None;
         _propertyGrid.Columns.Add(GridColumn(nameof(GamePropertyRow.Position), "格", 44));
@@ -1620,8 +1724,8 @@ public class MainForm : Form
     {
         _roomGrid.AutoGenerateColumns = false;
         _roomGrid.Columns.Clear();
-        _roomGrid.RowTemplate.Height = 32;
-        _roomGrid.ColumnHeadersHeight = 32;
+        _roomGrid.RowTemplate.Height = 42;
+        _roomGrid.ColumnHeadersHeight = 42;
         _roomGrid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
         _roomGrid.Columns.Add(GridColumn(nameof(RoomSummaryDto.RoomId), "房间", 74));
         _roomGrid.Columns.Add(GridColumn(nameof(RoomSummaryDto.RoomName), "名称", 180, true));
@@ -1655,7 +1759,7 @@ public class MainForm : Form
     {
         var page = new TabPage(title) { Padding = new Padding(8), BackColor = Color.FromArgb(238, 224, 184) };
         var layout = new TableLayoutPanel { Dock = DockStyle.Fill, RowCount = 2 };
-        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 46));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 60));
         layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         var toolbar = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = false };
         toolbar.Controls.AddRange([Button("刷新", () => ActiveFormSend("GetManageData")), Button("新增行", add), Button("保存选中", save), Button("删除数据库记录", delete)]);
@@ -1675,16 +1779,23 @@ public class MainForm : Form
 
     private static Button Button(string text, Action click)
     {
-        var button = new Button
+        using var buttonFont = new Font("Microsoft YaHei UI", 12F, FontStyle.Bold);
+        var measured = TextRenderer.MeasureText(text, buttonFont);
+        var button = new SolidTextButton
         {
             Text = text,
-            AutoSize = true,
-            Height = 32,
-            Margin = new Padding(5, 5, 5, 5),
+            AutoSize = false,
+            Width = Math.Max(108, measured.Width + 30),
+            Height = 54,
+            MinimumSize = new Size(92, 54),
+            Margin = new Padding(7, 6, 7, 6),
+            Padding = new Padding(8, 4, 8, 8),
             BackColor = Color.FromArgb(125, 51, 27),
             ForeColor = Color.White,
             FlatStyle = FlatStyle.Flat,
-            Font = new Font("Microsoft YaHei UI", 9F, FontStyle.Bold)
+            Font = new Font("Microsoft YaHei UI", 12F, FontStyle.Bold),
+            TextAlign = ContentAlignment.MiddleCenter,
+            UseCompatibleTextRendering = false
         };
         button.FlatAppearance.BorderSize = 0;
         button.Click += (_, _) => click();
@@ -1696,13 +1807,13 @@ public class MainForm : Form
         button.AutoSize = false;
         button.Dock = DockStyle.Fill;
         button.Margin = new Padding(4, 8, 4, 8);
-        button.Height = 46;
-        button.MinimumSize = new Size(74, 40);
+        button.Height = 52;
+        button.MinimumSize = new Size(96, 46);
         button.FlatStyle = FlatStyle.Flat;
         button.FlatAppearance.BorderSize = 0;
         button.BackColor = Color.FromArgb(125, 51, 27);
         button.ForeColor = Color.White;
-        button.Font = new Font("Microsoft YaHei UI", 9F, FontStyle.Bold);
+        button.Font = new Font("Microsoft YaHei UI", 11F, FontStyle.Bold);
         button.TextAlign = ContentAlignment.MiddleCenter;
     }
 
@@ -1745,14 +1856,19 @@ public class MainForm : Form
             {
                 BackColor = Color.FromArgb(81, 60, 34),
                 ForeColor = Color.White,
-                Font = new Font("Microsoft YaHei UI", 9F, FontStyle.Bold)
+                Font = new Font("Microsoft YaHei UI", 13F, FontStyle.Bold),
+                Alignment = DataGridViewContentAlignment.MiddleLeft,
+                Padding = new Padding(8, 0, 4, 0)
             },
             DefaultCellStyle = new DataGridViewCellStyle
             {
                 BackColor = Color.FromArgb(252, 248, 235),
                 SelectionBackColor = Color.FromArgb(171, 116, 52),
-                SelectionForeColor = Color.White
-            }
+                SelectionForeColor = Color.White,
+                Font = new Font("Microsoft YaHei UI", 11.5F, FontStyle.Regular),
+                Padding = new Padding(8, 0, 4, 0)
+            },
+            GridColor = Color.FromArgb(224, 210, 171)
         };
     }
 
@@ -1828,5 +1944,78 @@ public class MainForm : Form
         public int Value { get; set; }
         public string Description { get; set; } = string.Empty;
         public bool IsEnabled { get; set; }
+    }
+}
+
+internal sealed class TranslucentPanel : Panel
+{
+    public Color FillColor { get; set; } = Color.FromArgb(180, Color.White);
+
+    public Color BorderColor { get; set; } = Color.FromArgb(100, Color.Black);
+
+    public TranslucentPanel()
+    {
+        SetStyle(ControlStyles.AllPaintingInWmPaint
+            | ControlStyles.UserPaint
+            | ControlStyles.OptimizedDoubleBuffer
+            | ControlStyles.SupportsTransparentBackColor, true);
+        BackColor = Color.Transparent;
+    }
+
+    protected override void OnPaintBackground(PaintEventArgs e)
+    {
+        base.OnPaintBackground(e);
+    }
+
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        using var fill = new SolidBrush(FillColor);
+        using var border = new Pen(BorderColor, 1);
+        var rect = ClientRectangle;
+        rect.Width -= 1;
+        rect.Height -= 1;
+        e.Graphics.FillRectangle(fill, rect);
+        e.Graphics.DrawRectangle(border, rect);
+        base.OnPaint(e);
+    }
+}
+
+internal sealed class SolidTextButton : Button
+{
+    public SolidTextButton()
+    {
+        SetStyle(ControlStyles.UserPaint
+            | ControlStyles.AllPaintingInWmPaint
+            | ControlStyles.OptimizedDoubleBuffer
+            | ControlStyles.ResizeRedraw, true);
+    }
+
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        var backColor = Enabled
+            ? BackColor
+            : Color.FromArgb(154, 120, 101);
+        if (ClientRectangle.Contains(PointToClient(Cursor.Position)) && Enabled)
+        {
+            backColor = ControlPaint.Light(backColor, 0.12f);
+        }
+
+        using var background = new SolidBrush(backColor);
+        e.Graphics.FillRectangle(background, ClientRectangle);
+
+        var textRect = ClientRectangle;
+        textRect.Inflate(-Padding.Horizontal / 2, -Padding.Vertical / 2);
+        textRect.Offset(0, -1);
+        TextRenderer.DrawText(
+            e.Graphics,
+            Text,
+            Font,
+            textRect,
+            Enabled ? ForeColor : Color.FromArgb(235, 224, 214),
+            TextFormatFlags.HorizontalCenter
+                | TextFormatFlags.VerticalCenter
+                | TextFormatFlags.SingleLine
+                | TextFormatFlags.NoPrefix
+                | TextFormatFlags.NoClipping);
     }
 }
