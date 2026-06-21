@@ -91,9 +91,9 @@ public class MainForm : Form
         ForeColor = Color.FromArgb(92, 67, 38)
     };
     private readonly PictureBox _dicePicture = new() { Width = 58, Height = 58, SizeMode = PictureBoxSizeMode.Zoom };
-    private readonly Button _btnRoll = new() { Text = "掷骰子", Width = 92, Height = 34 };
-    private readonly Button _btnBuy = new() { Text = "购买地产", Width = 92, Height = 34 };
-    private readonly Button _btnEnd = new() { Text = "结束回合", Width = 92, Height = 34 };
+    private readonly Button _btnRoll = new SolidTextButton { Text = "掷骰", Width = 116, Height = 58 };
+    private readonly Button _btnBuy = new SolidTextButton { Text = "购买", Width = 116, Height = 58 };
+    private readonly Button _btnEnd = new SolidTextButton { Text = "结束", Width = 116, Height = 58 };
     private readonly DataGridView _mapGrid = Grid(true);
     private readonly DataGridView _managePropertyGrid = Grid(true);
     private readonly DataGridView _eventGrid = Grid(true);
@@ -646,7 +646,7 @@ public class MainForm : Form
         var page = Page("游戏棋盘");
         var layout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1 };
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 470));
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 590));
         page.Controls.Add(layout);
 
         var boardHost = new Panel
@@ -674,11 +674,11 @@ public class MainForm : Form
             BackColor = Color.Transparent
         };
         side.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        side.RowStyles.Add(new RowStyle(SizeType.Absolute, 96));
-        side.RowStyles.Add(new RowStyle(SizeType.Absolute, 116));
-        side.RowStyles.Add(new RowStyle(SizeType.Absolute, 212));
-        side.RowStyles.Add(new RowStyle(SizeType.Percent, 45));
-        side.RowStyles.Add(new RowStyle(SizeType.Percent, 55));
+        side.RowStyles.Add(new RowStyle(SizeType.Absolute, 132));
+        side.RowStyles.Add(new RowStyle(SizeType.Absolute, 112));
+        side.RowStyles.Add(new RowStyle(SizeType.Absolute, 238));
+        side.RowStyles.Add(new RowStyle(SizeType.Absolute, 380));
+        side.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
 
         side.Controls.Add(BuildTurnStatusPanel(), 0, 0);
         side.Controls.Add(BuildGameControlsPanel(), 0, 1);
@@ -694,7 +694,7 @@ public class MainForm : Form
         void ResizeGameSidePanel()
         {
             var width = Math.Max(0, sideScroll.ClientSize.Width - SystemInformation.VerticalScrollBarWidth - 2);
-            var height = Math.Max(980, sideScroll.ClientSize.Height - 2);
+            var height = Math.Max(1150, sideScroll.ClientSize.Height - 2);
             side.Width = width;
             side.Height = height;
         }
@@ -707,14 +707,18 @@ public class MainForm : Form
             Dock = DockStyle.Fill,
             RowCount = 2,
             BackColor = Color.FromArgb(245, 236, 207),
-            Padding = new Padding(10, 7, 10, 7)
+            Padding = new Padding(14, 12, 14, 12)
         };
-        panel.RowStyles.Add(new RowStyle(SizeType.Absolute, 36));
-        panel.RowStyles.Add(new RowStyle(SizeType.Absolute, 30));
-        _lblTurn.MinimumSize = new Size(0, 30);
-        _lblActionHint.MinimumSize = new Size(0, 26);
-        _lblTurn.Margin = new Padding(0, 2, 0, 2);
-        _lblActionHint.Margin = new Padding(0, 2, 0, 2);
+        panel.RowStyles.Add(new RowStyle(SizeType.Absolute, 50));
+        panel.RowStyles.Add(new RowStyle(SizeType.Absolute, 48));
+        _lblTurn.MinimumSize = new Size(0, 44);
+        _lblActionHint.MinimumSize = new Size(0, 42);
+        _lblTurn.Font = new Font("Microsoft YaHei UI", 12F, FontStyle.Bold);
+        _lblActionHint.Font = new Font("Microsoft YaHei UI", 12F, FontStyle.Bold);
+        _lblTurn.Margin = new Padding(0, 2, 0, 4);
+        _lblActionHint.Margin = new Padding(0, 4, 0, 2);
+        _lblTurn.UseCompatibleTextRendering = true;
+        _lblActionHint.UseCompatibleTextRendering = true;
         panel.Controls.Add(_lblTurn, 0, 0);
         panel.Controls.Add(_lblActionHint, 0, 1);
         return panel;
@@ -732,9 +736,9 @@ public class MainForm : Form
             ColumnCount = 2,
             RowCount = 1,
             BackColor = Color.FromArgb(245, 236, 207),
-            Padding = new Padding(8, 7, 8, 7)
+            Padding = new Padding(10, 8, 10, 8)
         };
-        panel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 70));
+        panel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 76));
         panel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
 
         _dicePicture.Dock = DockStyle.Fill;
@@ -747,8 +751,11 @@ public class MainForm : Form
             Dock = DockStyle.Fill,
             ColumnCount = 3,
             RowCount = 1,
-            BackColor = Color.Transparent
+            BackColor = Color.Transparent,
+            Margin = Padding.Empty,
+            Padding = Padding.Empty
         };
+        actions.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.33F));
         actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.34F));
         actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.33F));
@@ -770,8 +777,8 @@ public class MainForm : Form
             Padding = new Padding(2)
         };
         layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 46));
-        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 104));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 50));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 112));
 
         _chatMessages.BackColor = Color.FromArgb(252, 248, 235);
         _chatMessages.BorderStyle = BorderStyle.None;
@@ -787,8 +794,9 @@ public class MainForm : Form
             Padding = new Padding(0, 4, 0, 2)
         };
         input.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        input.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 78));
-        _txtChat.MinimumSize = new Size(0, 34);
+        input.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 86));
+        _txtChat.MinimumSize = new Size(0, 38);
+        _txtChat.Font = new Font("Microsoft YaHei UI", 10.5F, FontStyle.Regular);
         _txtChat.Margin = new Padding(0, 0, 6, 0);
         input.Controls.Add(_txtChat, 0, 0);
         var sendButton = SmallButton("发送", SendChatFromInput);
@@ -806,7 +814,7 @@ public class MainForm : Form
             AutoScroll = false,
             BackColor = Color.Transparent,
             Margin = Padding.Empty,
-            Padding = new Padding(0, 3, 0, 0)
+            Padding = new Padding(0, 2, 0, 0)
         };
 
         var chatButtons = new (string Text, Action Click)[]
@@ -824,20 +832,20 @@ public class MainForm : Form
             actions.Controls.Add(SmallButton(text, click));
         }
 
-        var voiceButton = new Button
+        var voiceButton = new SolidTextButton
         {
             Text = "语音",
             Enabled = false,
             AutoSize = false,
-            Width = 52,
-            Height = 38,
-            MinimumSize = new Size(48, 36),
+            Width = 64,
+            Height = 42,
+            MinimumSize = new Size(64, 40),
             BackColor = Color.FromArgb(222, 211, 185),
             ForeColor = Color.FromArgb(111, 90, 65),
             FlatStyle = FlatStyle.Flat,
-            Font = new Font("Microsoft YaHei UI", 8F, FontStyle.Bold),
+            Font = new Font("Microsoft YaHei UI", 9.5F, FontStyle.Bold),
             TextAlign = ContentAlignment.MiddleCenter,
-            Padding = new Padding(3, 0, 3, 0),
+            Padding = new Padding(4, 0, 4, 0),
             Margin = new Padding(2, 4, 2, 2)
         };
         actions.Controls.Add(voiceButton);
@@ -846,14 +854,18 @@ public class MainForm : Form
         layout.Controls.Add(input, 0, 1);
         layout.Controls.Add(actions, 0, 2);
         var group = Group("聊天互动", layout);
-        group.MinimumSize = new Size(0, 280);
+        group.MinimumSize = new Size(0, 370);
         return group;
     }
 
 
     private Control BuildDetailTabs()
     {
-        var tabs = new TabControl { Dock = DockStyle.Fill };
+        var tabs = new TabControl
+        {
+            Dock = DockStyle.Fill,
+            Font = new Font("Microsoft YaHei UI", 10.5F, FontStyle.Bold)
+        };
         var propertyPage = new TabPage("地产") { BackColor = Color.FromArgb(245, 236, 207), Padding = new Padding(4) };
         var logPage = new TabPage("日志") { BackColor = Color.FromArgb(245, 236, 207), Padding = new Padding(4) };
         propertyPage.Controls.Add(_propertyGrid);
@@ -1103,7 +1115,7 @@ public class MainForm : Form
         _lastGameStatus = state.Status;
 
         _lblTurn.Text = state.Status == "Playing"
-            ? $"房间 {state.RoomId} | 第 {state.RoundNumber} 回合 | 当前：{state.CurrentPlayerName}"
+            ? $"房间 {state.RoomId} | 第 {state.RoundNumber} 回合"
             : $"房间 {state.RoomId} | 状态：{state.Status}";
 
         _boardView.ApplyState(state);
@@ -1117,8 +1129,8 @@ public class MainForm : Form
         _lblActionHint.Text = state.Status != "Playing"
             ? "等待玩家准备"
             : isMyTurn
-                ? state.CanBuyProperty ? "轮到你行动，可购买当前位置地产" : "轮到你行动"
-                : $"等待 {state.CurrentPlayerName} 行动";
+                ? state.CanBuyProperty ? $"当前：{state.CurrentPlayerName} | 可购买当前位置地产" : $"当前：{state.CurrentPlayerName} | 轮到你行动"
+                : $"当前：{state.CurrentPlayerName} | 等待其行动";
         SetGameButtons(isMyTurn, state.CanBuyProperty);
     }
 
@@ -1200,10 +1212,10 @@ public class MainForm : Form
                     : Color.FromArgb(185, 163, 116);
         var card = new Panel
         {
-            Height = 168,
-            Width = Math.Max(280, _playerCards.ClientSize.Width - 26),
+            Height = 206,
+            Width = Math.Max(420, _playerCards.ClientSize.Width - SystemInformation.VerticalScrollBarWidth - 14),
             Margin = new Padding(0, 0, 6, 8),
-            Padding = new Padding(8),
+            Padding = new Padding(10),
             BackColor = player.IsBankrupt
                 ? Color.FromArgb(224, 215, 205)
                 : isMe
@@ -1223,7 +1235,7 @@ public class MainForm : Form
             RowCount = 1,
             BackColor = Color.FromArgb(0, 255, 255, 255)
         };
-        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 62));
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 72));
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
 
         var token = new PictureBox
@@ -1232,26 +1244,26 @@ public class MainForm : Form
             SizeMode = PictureBoxSizeMode.Zoom,
             Image = AssetCatalog.GetImage(player.TokenImageFile)
                 ?? AssetCatalog.GetImage(AssetCatalog.TokenOptions[player.UserId % AssetCatalog.TokenOptions.Length].ImageFile),
-            Margin = new Padding(0, 6, 10, 6)
+            Margin = new Padding(0, 8, 12, 8)
         };
         layout.Controls.Add(token, 0, 0);
 
         var main = new TableLayoutPanel { Dock = DockStyle.Fill, RowCount = 4, BackColor = Color.Transparent };
-        main.RowStyles.Add(new RowStyle(SizeType.Absolute, 40));
-        main.RowStyles.Add(new RowStyle(SizeType.Absolute, 25));
-        main.RowStyles.Add(new RowStyle(SizeType.Absolute, 30));
-        main.RowStyles.Add(new RowStyle(SizeType.Absolute, 54));
+        main.RowStyles.Add(new RowStyle(SizeType.Absolute, 46));
+        main.RowStyles.Add(new RowStyle(SizeType.Absolute, 36));
+        main.RowStyles.Add(new RowStyle(SizeType.Absolute, 36));
+        main.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
 
         var header = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, BackColor = Color.Transparent };
         header.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        header.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 146));
+        header.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 158));
         header.Controls.Add(new Label
         {
             Text = player.UserName,
             Dock = DockStyle.Fill,
-            AutoEllipsis = true,
+            AutoEllipsis = false,
             TextAlign = ContentAlignment.MiddleLeft,
-            Font = new Font("Microsoft YaHei UI", 10F, FontStyle.Bold),
+            Font = new Font("Microsoft YaHei UI", 11.5F, FontStyle.Bold),
             ForeColor = Color.FromArgb(56, 36, 19)
         }, 0, 0);
         header.Controls.Add(new MoneyBillView
@@ -1263,25 +1275,12 @@ public class MainForm : Form
         }, 1, 0);
         main.Controls.Add(header, 0, 0);
 
-        main.Controls.Add(new Label
-        {
-            Text = $"位置 {player.Position} · {CellNameAt(state, player.Position)}",
-            Dock = DockStyle.Fill,
-            AutoEllipsis = true,
-            TextAlign = ContentAlignment.MiddleLeft,
-            ForeColor = Color.FromArgb(92, 67, 38)
-        }, 0, 1);
+        main.Controls.Add(PlayerInfoLabel($"位置 {player.Position} · {CellNameAt(state, player.Position)}"), 0, 1);
 
-        main.Controls.Add(new Label
-        {
-            Text = player.SkipTurnRounds > 0
-                ? $"地产 {player.OwnedProperties} 处 · 免租卡 {player.FreeRentCards} 张 · 休息中"
-                : $"地产 {player.OwnedProperties} 处 · 免租卡 {player.FreeRentCards} 张",
-            Dock = DockStyle.Fill,
-            AutoEllipsis = true,
-            TextAlign = ContentAlignment.MiddleLeft,
-            ForeColor = Color.FromArgb(92, 67, 38)
-        }, 0, 2);
+        var assetText = player.SkipTurnRounds > 0
+            ? $"地产 {player.OwnedProperties} 处  |  免租 {player.FreeRentCards} 张  |  休息中"
+            : $"地产 {player.OwnedProperties} 处  |  免租 {player.FreeRentCards} 张";
+        main.Controls.Add(PlayerInfoLabel(assetText), 0, 2);
 
         var footer = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 1, BackColor = Color.Transparent };
         footer.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
@@ -1334,6 +1333,21 @@ public class MainForm : Form
         };
     }
 
+    private static Label PlayerInfoLabel(string text)
+    {
+        return new Label
+        {
+            Text = text,
+            Dock = DockStyle.Fill,
+            AutoEllipsis = false,
+            AutoSize = false,
+            TextAlign = ContentAlignment.MiddleLeft,
+            Font = new Font("Microsoft YaHei UI", 10.5F, FontStyle.Bold),
+            ForeColor = Color.FromArgb(92, 67, 38),
+            Padding = new Padding(0, 0, 4, 0)
+        };
+    }
+
     private static string CellNameAt(GameStateDto state, int position)
     {
         return state.MapCells.FirstOrDefault(x => x.CellIndex == position)?.CellName
@@ -1343,7 +1357,7 @@ public class MainForm : Form
 
     private void ResizePlayerCards()
     {
-        var width = Math.Max(280, _playerCards.ClientSize.Width - 26);
+        var width = Math.Max(420, _playerCards.ClientSize.Width - SystemInformation.VerticalScrollBarWidth - 14);
         foreach (var card in _playerCards.Controls.OfType<Panel>())
         {
             card.Width = width;
@@ -1709,15 +1723,23 @@ public class MainForm : Form
     {
         _propertyGrid.AutoGenerateColumns = false;
         _propertyGrid.Columns.Clear();
-        _propertyGrid.RowTemplate.Height = 38;
-        _propertyGrid.ColumnHeadersHeight = 40;
+        _propertyGrid.RowTemplate.Height = 34;
+        _propertyGrid.ColumnHeadersHeight = 36;
         _propertyGrid.AutoSizeRowsMode = DataGridViewAutoSizeRowsMode.None;
         _propertyGrid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None;
-        _propertyGrid.Columns.Add(GridColumn(nameof(GamePropertyRow.Position), "格", 44));
+        _propertyGrid.ColumnHeadersDefaultCellStyle.Font = new Font("Microsoft YaHei UI", 10F, FontStyle.Bold);
+        _propertyGrid.ColumnHeadersDefaultCellStyle.Padding = new Padding(2, 0, 1, 0);
+        _propertyGrid.DefaultCellStyle.Font = new Font("Microsoft YaHei UI", 10F, FontStyle.Regular);
+        _propertyGrid.DefaultCellStyle.Padding = new Padding(2, 0, 1, 0);
+        _propertyGrid.Columns.Add(GridColumn(nameof(GamePropertyRow.Position), "格", 64));
         _propertyGrid.Columns.Add(GridColumn(nameof(GamePropertyRow.Name), "地产", 128, true));
-        _propertyGrid.Columns.Add(GridColumn(nameof(GamePropertyRow.Price), "价", 58));
-        _propertyGrid.Columns.Add(GridColumn(nameof(GamePropertyRow.Rent), "租", 58));
-        _propertyGrid.Columns.Add(GridColumn(nameof(GamePropertyRow.Owner), "归属", 92, true));
+        _propertyGrid.Columns.Add(GridColumn(nameof(GamePropertyRow.Price), "价格", 88));
+        _propertyGrid.Columns.Add(GridColumn(nameof(GamePropertyRow.Rent), "租金", 84));
+        _propertyGrid.Columns.Add(GridColumn(nameof(GamePropertyRow.Owner), "归属", 100));
+        foreach (DataGridViewColumn column in _propertyGrid.Columns)
+        {
+            column.MinimumWidth = column.Width;
+        }
     }
 
     private void ConfigureRoomGrid()
@@ -1806,14 +1828,15 @@ public class MainForm : Form
     {
         button.AutoSize = false;
         button.Dock = DockStyle.Fill;
-        button.Margin = new Padding(4, 8, 4, 8);
-        button.Height = 52;
-        button.MinimumSize = new Size(96, 46);
+        button.Margin = new Padding(6, 10, 6, 10);
+        button.Height = 68;
+        button.MinimumSize = new Size(112, 58);
+        button.Padding = new Padding(0);
         button.FlatStyle = FlatStyle.Flat;
         button.FlatAppearance.BorderSize = 0;
         button.BackColor = Color.FromArgb(125, 51, 27);
         button.ForeColor = Color.White;
-        button.Font = new Font("Microsoft YaHei UI", 11F, FontStyle.Bold);
+        button.Font = new Font("Microsoft YaHei UI", 13F, FontStyle.Bold);
         button.TextAlign = ContentAlignment.MiddleCenter;
     }
 
@@ -1821,10 +1844,10 @@ public class MainForm : Form
     {
         var button = Button(text, click);
         button.AutoSize = false;
-        button.Font = new Font("Microsoft YaHei UI", 8F, FontStyle.Bold);
-        button.Width = Math.Max(56, TextRenderer.MeasureText(text, button.Font).Width + 22);
-        button.Height = 38;
-        button.MinimumSize = new Size(52, 36);
+        button.Font = new Font("Microsoft YaHei UI", 9.5F, FontStyle.Bold);
+        button.Width = Math.Max(66, TextRenderer.MeasureText(text, button.Font).Width + 24);
+        button.Height = 42;
+        button.MinimumSize = new Size(62, 40);
         button.Margin = new Padding(2, 4, 2, 2);
         button.Padding = new Padding(4, 0, 4, 0);
         button.TextAlign = ContentAlignment.MiddleCenter;
