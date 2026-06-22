@@ -5,101 +5,12 @@ using MonopolyModels.Dtos;
 
 namespace MonopolyClient;
 
-public class MainForm : Form
+public partial class MainForm : Form
 {
     private readonly GameTcpClient _client = new();
-    private readonly Panel _loginPage = new() { Dock = DockStyle.Fill };
-    private readonly Panel _mainShell = new() { Dock = DockStyle.Fill, Visible = false };
-    private readonly TranslucentPanel _loginCard = new();
-    private readonly TableLayoutPanel _loginLayout = new();
-    private readonly TableLayoutPanel _loginButtons = new();
     private float _lastLoginScale = -1f;
     private Rectangle _lastLoginBounds = Rectangle.Empty;
-    private readonly TextBox _txtIp = new() { Text = "127.0.0.1", Width = 220 };
-    private readonly NumericUpDown _numPort = new() { Minimum = 1, Maximum = 65535, Value = 9000, Width = 110 };
-    private readonly TextBox _txtUser = new() { Text = "player1", Width = 320 };
-    private readonly TextBox _txtPassword = new() { Text = "123456", Width = 320, UseSystemPasswordChar = true };
-    private readonly ComboBox _roomTokenCombo = new() { Width = 150, DropDownStyle = ComboBoxStyle.DropDownList };
-    private readonly Label _lblLoginStatus = new() { AutoSize = false, Height = 34, Text = "请先连接服务器", TextAlign = ContentAlignment.MiddleCenter };
-    private readonly Label _lblStatus = new() { AutoSize = true, Text = "未连接" };
-    private readonly Label _lblUser = new() { AutoSize = true, Text = "未登录" };
-    private readonly Label _lblToken = new() { AutoSize = true, Text = "棋子：-" };
-    private readonly DataGridView _roomGrid = Grid();
-    private readonly TextBox _txtRoomName = new() { Text = "河南文旅房间", Width = 180 };
-    private readonly NumericUpDown _numMaxPlayers = new() { Minimum = 2, Maximum = 4, Value = 2, Width = 60 };
-    private readonly BoardView _boardView = new() { Dock = DockStyle.Fill };
-    private readonly FlowLayoutPanel _playerCards = new()
-    {
-        Dock = DockStyle.Fill,
-        FlowDirection = FlowDirection.TopDown,
-        WrapContents = false,
-        AutoScroll = true,
-        Padding = new Padding(2),
-        BackColor = Color.FromArgb(245, 236, 207)
-    };
-    private readonly FlowLayoutPanel _chatMessages = new()
-    {
-        Dock = DockStyle.Fill,
-        FlowDirection = FlowDirection.TopDown,
-        WrapContents = false,
-        AutoScroll = true,
-        Padding = new Padding(2),
-        BackColor = Color.FromArgb(252, 248, 235)
-    };
-    private readonly TextBox _txtChat = new()
-    {
-        Dock = DockStyle.Fill,
-        MaxLength = 80
-    };
     private readonly GameSoundPlayer _sounds = new();
-    private readonly CheckBox _chkSound = new()
-    {
-        Text = "音效",
-        AutoSize = true,
-        Checked = true,
-        Margin = new Padding(0, 12, 8, 0),
-        ForeColor = Color.FromArgb(64, 44, 25)
-    };
-    private readonly DataGridView _propertyGrid = Grid();
-    private readonly TextBox _logText = new()
-    {
-        Dock = DockStyle.Fill,
-        Multiline = true,
-        ReadOnly = true,
-        ScrollBars = ScrollBars.Vertical,
-        WordWrap = true,
-        BorderStyle = BorderStyle.None,
-        BackColor = Color.FromArgb(252, 248, 235),
-        ForeColor = Color.FromArgb(55, 38, 22),
-        Font = new Font("Microsoft YaHei UI", 9F)
-    };
-    private readonly Label _lblTurn = new()
-    {
-        AutoSize = false,
-        Dock = DockStyle.Fill,
-        Text = "当前回合：-",
-        TextAlign = ContentAlignment.MiddleLeft,
-        Font = new Font("Microsoft YaHei UI", 10F, FontStyle.Bold),
-        ForeColor = Color.FromArgb(64, 44, 25)
-    };
-    private readonly Label _lblActionHint = new()
-    {
-        AutoSize = false,
-        Dock = DockStyle.Fill,
-        Text = "等待开局",
-        TextAlign = ContentAlignment.MiddleLeft,
-        ForeColor = Color.FromArgb(92, 67, 38)
-    };
-    private readonly PictureBox _dicePicture = new() { Width = 58, Height = 58, SizeMode = PictureBoxSizeMode.Zoom };
-    private readonly Button _btnRoll = new SolidTextButton { Text = "掷骰", Width = 116, Height = 58 };
-    private readonly Button _btnBuy = new SolidTextButton { Text = "购买", Width = 116, Height = 58 };
-    private readonly Button _btnEnd = new SolidTextButton { Text = "结束", Width = 116, Height = 58 };
-    private readonly DataGridView _mapGrid = Grid(true);
-    private readonly DataGridView _managePropertyGrid = Grid(true);
-    private readonly DataGridView _eventGrid = Grid(true);
-    private readonly DataGridView _rankGrid = Grid();
-    private readonly DataGridView _historyGrid = Grid();
-    private readonly TabControl _tabs = new() { Dock = DockStyle.Fill };
 
     private int _userId;
     private string _userName = string.Empty;
@@ -113,11 +24,16 @@ public class MainForm : Form
 
     public MainForm()
     {
-        Text = "河南文旅大富翁";
-        MinimumSize = new Size(1240, 820);
-        StartPosition = FormStartPosition.CenterScreen;
-        Font = new Font("Microsoft YaHei UI", 9F);
-        BackColor = Color.FromArgb(31, 54, 42);
+        InitializeComponent();
+
+        if (IsInWinFormsDesigner())
+        {
+            ApplyDesignerAssets();
+            return;
+        }
+
+        Controls.Clear();
+        ClearDesignerLayoutForRuntime();
 
         _client.MessageReceived += message =>
         {
@@ -143,10 +59,75 @@ public class MainForm : Form
     {
         if (disposing)
         {
+            components?.Dispose();
             _client.Dispose();
         }
 
         base.Dispose(disposing);
+    }
+
+    private static bool IsInWinFormsDesigner()
+    {
+        var processName = System.Diagnostics.Process.GetCurrentProcess().ProcessName;
+        return LicenseManager.UsageMode == LicenseUsageMode.Designtime
+            || processName.Contains("DesignToolsServer", StringComparison.OrdinalIgnoreCase)
+            || processName.Contains("devenv", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private void ApplyDesignerAssets()
+    {
+        _loginPage.BackgroundImage = AssetCatalog.GetImage("登录界面.png");
+        designerLobbyPreview.BackgroundImage = AssetCatalog.GetImage("棋盘中间.png");
+    }
+
+    private void ClearDesignerLayoutForRuntime()
+    {
+        foreach (var control in new Control[]
+        {
+            _txtIp,
+            _numPort,
+            _txtUser,
+            _txtPassword,
+            _txtRoomName,
+            _numMaxPlayers,
+            _roomTokenCombo,
+            _lblLoginStatus,
+            _lblStatus,
+            _lblUser,
+            _lblToken,
+            _chkSound,
+            _roomGrid,
+            _boardView,
+            _playerCards,
+            _chatMessages,
+            _txtChat,
+            _propertyGrid,
+            _logText,
+            _lblTurn,
+            _lblActionHint,
+            _dicePicture,
+            _btnRoll,
+            _btnBuy,
+            _btnEnd,
+            _mapGrid,
+            _managePropertyGrid,
+            _eventGrid,
+            _rankGrid,
+            _historyGrid,
+            _tabs
+        })
+        {
+            control.Parent?.Controls.Remove(control);
+        }
+
+        _mainShell.Controls.Clear();
+        _loginPage.Controls.Clear();
+        _loginCard.Controls.Clear();
+        _loginLayout.Controls.Clear();
+        _loginButtons.Controls.Clear();
+        _tabs.TabPages.Clear();
+        _playerCards.Controls.Clear();
+        _chatMessages.Controls.Clear();
     }
 
     private void BuildUi()
@@ -157,6 +138,7 @@ public class MainForm : Form
 
         Controls.Add(_mainShell);
         Controls.Add(_loginPage);
+        ApplyRuntimeTheme();
         ConfigureRoomGrid();
         ConfigurePropertyGrid();
         BuildLoginPage();
@@ -327,6 +309,7 @@ public class MainForm : Form
         else if (control is NumericUpDown numeric)
         {
             numeric.MinimumSize = new Size(0, 32);
+            numeric.MaximumSize = Size.Empty;
         }
     }
 
@@ -646,7 +629,7 @@ public class MainForm : Form
         var page = Page("游戏棋盘");
         var layout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1 };
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 590));
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 650));
         page.Controls.Add(layout);
 
         var boardHost = new Panel
@@ -674,10 +657,10 @@ public class MainForm : Form
             BackColor = Color.Transparent
         };
         side.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        side.RowStyles.Add(new RowStyle(SizeType.Absolute, 132));
-        side.RowStyles.Add(new RowStyle(SizeType.Absolute, 112));
-        side.RowStyles.Add(new RowStyle(SizeType.Absolute, 238));
-        side.RowStyles.Add(new RowStyle(SizeType.Absolute, 380));
+        side.RowStyles.Add(new RowStyle(SizeType.Absolute, 126));
+        side.RowStyles.Add(new RowStyle(SizeType.Absolute, 78));
+        side.RowStyles.Add(new RowStyle(SizeType.Absolute, 230));
+        side.RowStyles.Add(new RowStyle(SizeType.Absolute, 354));
         side.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
 
         side.Controls.Add(BuildTurnStatusPanel(), 0, 0);
@@ -693,8 +676,8 @@ public class MainForm : Form
 
         void ResizeGameSidePanel()
         {
-            var width = Math.Max(0, sideScroll.ClientSize.Width - SystemInformation.VerticalScrollBarWidth - 2);
-            var height = Math.Max(1150, sideScroll.ClientSize.Height - 2);
+            var width = Math.Max(0, sideScroll.ClientSize.Width - SystemInformation.VerticalScrollBarWidth);
+            var height = Math.Max(1040, sideScroll.ClientSize.Height - 2);
             side.Width = width;
             side.Height = height;
         }
@@ -736,13 +719,14 @@ public class MainForm : Form
             ColumnCount = 2,
             RowCount = 1,
             BackColor = Color.FromArgb(245, 236, 207),
-            Padding = new Padding(10, 8, 10, 8)
+            Padding = new Padding(8, 4, 8, 4)
         };
-        panel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 76));
+        panel.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        panel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 60));
         panel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
 
         _dicePicture.Dock = DockStyle.Fill;
-        _dicePicture.Margin = new Padding(0, 2, 8, 2);
+        _dicePicture.Margin = new Padding(0, 0, 8, 0);
         _dicePicture.BackColor = Color.FromArgb(252, 248, 235);
         panel.Controls.Add(_dicePicture, 0, 0);
 
@@ -864,10 +848,21 @@ public class MainForm : Form
         var tabs = new TabControl
         {
             Dock = DockStyle.Fill,
-            Font = new Font("Microsoft YaHei UI", 10.5F, FontStyle.Bold)
+            Font = new Font("Microsoft YaHei UI", 10.5F, FontStyle.Bold),
+            Margin = Padding.Empty
         };
-        var propertyPage = new TabPage("地产") { BackColor = Color.FromArgb(245, 236, 207), Padding = new Padding(4) };
-        var logPage = new TabPage("日志") { BackColor = Color.FromArgb(245, 236, 207), Padding = new Padding(4) };
+        var propertyPage = new TabPage("地产")
+        {
+            BackColor = Color.FromArgb(245, 236, 207),
+            Padding = new Padding(4),
+            UseVisualStyleBackColor = false
+        };
+        var logPage = new TabPage("日志")
+        {
+            BackColor = Color.FromArgb(245, 236, 207),
+            Padding = new Padding(4),
+            UseVisualStyleBackColor = false
+        };
         propertyPage.Controls.Add(_propertyGrid);
         logPage.Controls.Add(_logText);
         tabs.TabPages.Add(propertyPage);
@@ -1575,6 +1570,9 @@ public class MainForm : Form
         _btnRoll.Enabled = isMyTurn;
         _btnBuy.Enabled = isMyTurn && canBuy;
         _btnEnd.Enabled = isMyTurn;
+        _btnRoll.Invalidate();
+        _btnBuy.Invalidate();
+        _btnEnd.Invalidate();
     }
 
     private void AddLocalMapRow()
@@ -1719,6 +1717,68 @@ public class MainForm : Form
         return group;
     }
 
+    private void ApplyRuntimeTheme()
+    {
+        ApplyGridTheme(_roomGrid);
+        ApplyGridTheme(_propertyGrid);
+        ApplyGridTheme(_mapGrid, editable: true);
+        ApplyGridTheme(_managePropertyGrid, editable: true);
+        ApplyGridTheme(_eventGrid, editable: true);
+        ApplyGridTheme(_rankGrid);
+        ApplyGridTheme(_historyGrid);
+
+        _logText.BackColor = Color.FromArgb(252, 248, 235);
+        _logText.ForeColor = Color.FromArgb(55, 38, 22);
+        _logText.BorderStyle = BorderStyle.None;
+        _logText.Font = new Font("Microsoft YaHei UI", 10F);
+        _logText.WordWrap = true;
+        _logText.ScrollBars = ScrollBars.Vertical;
+    }
+
+    private static void ApplyGridTheme(DataGridView grid, bool editable = false)
+    {
+        grid.Dock = DockStyle.Fill;
+        grid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+        grid.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
+        grid.MultiSelect = false;
+        grid.AllowUserToAddRows = false;
+        grid.AllowUserToDeleteRows = false;
+        grid.ReadOnly = !editable;
+        grid.BackgroundColor = Color.FromArgb(252, 248, 235);
+        grid.BorderStyle = BorderStyle.None;
+        grid.RowHeadersVisible = false;
+        grid.EnableHeadersVisualStyles = false;
+        grid.GridColor = Color.FromArgb(224, 210, 171);
+        grid.ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.Single;
+        grid.CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal;
+        grid.RowTemplate.Height = 34;
+        grid.ColumnHeadersHeight = 38;
+        grid.ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle
+        {
+            BackColor = Color.FromArgb(81, 60, 34),
+            ForeColor = Color.White,
+            Font = new Font("Microsoft YaHei UI", 12F, FontStyle.Bold),
+            Alignment = DataGridViewContentAlignment.MiddleLeft,
+            Padding = new Padding(8, 0, 4, 0)
+        };
+        grid.DefaultCellStyle = new DataGridViewCellStyle
+        {
+            BackColor = Color.FromArgb(252, 248, 235),
+            ForeColor = Color.FromArgb(55, 38, 22),
+            SelectionBackColor = Color.FromArgb(171, 116, 52),
+            SelectionForeColor = Color.White,
+            Font = new Font("Microsoft YaHei UI", 11F, FontStyle.Regular),
+            Padding = new Padding(8, 0, 4, 0)
+        };
+        grid.AlternatingRowsDefaultCellStyle = new DataGridViewCellStyle
+        {
+            BackColor = Color.FromArgb(248, 240, 216),
+            ForeColor = Color.FromArgb(55, 38, 22),
+            SelectionBackColor = Color.FromArgb(171, 116, 52),
+            SelectionForeColor = Color.White
+        };
+    }
+
     private void ConfigurePropertyGrid()
     {
         _propertyGrid.AutoGenerateColumns = false;
@@ -1726,19 +1786,22 @@ public class MainForm : Form
         _propertyGrid.RowTemplate.Height = 34;
         _propertyGrid.ColumnHeadersHeight = 36;
         _propertyGrid.AutoSizeRowsMode = DataGridViewAutoSizeRowsMode.None;
-        _propertyGrid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None;
+        _propertyGrid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+        _propertyGrid.ScrollBars = ScrollBars.Vertical;
         _propertyGrid.ColumnHeadersDefaultCellStyle.Font = new Font("Microsoft YaHei UI", 10F, FontStyle.Bold);
         _propertyGrid.ColumnHeadersDefaultCellStyle.Padding = new Padding(2, 0, 1, 0);
         _propertyGrid.DefaultCellStyle.Font = new Font("Microsoft YaHei UI", 10F, FontStyle.Regular);
         _propertyGrid.DefaultCellStyle.Padding = new Padding(2, 0, 1, 0);
-        _propertyGrid.Columns.Add(GridColumn(nameof(GamePropertyRow.Position), "格", 64));
-        _propertyGrid.Columns.Add(GridColumn(nameof(GamePropertyRow.Name), "地产", 128, true));
-        _propertyGrid.Columns.Add(GridColumn(nameof(GamePropertyRow.Price), "价格", 88));
-        _propertyGrid.Columns.Add(GridColumn(nameof(GamePropertyRow.Rent), "租金", 84));
-        _propertyGrid.Columns.Add(GridColumn(nameof(GamePropertyRow.Owner), "归属", 100));
+        _propertyGrid.Columns.Add(GridColumn(nameof(GamePropertyRow.Position), "格", 52));
+        _propertyGrid.Columns.Add(GridColumn(nameof(GamePropertyRow.Name), "地产", 150, true));
+        _propertyGrid.Columns.Add(GridColumn(nameof(GamePropertyRow.Price), "价格", 82));
+        _propertyGrid.Columns.Add(GridColumn(nameof(GamePropertyRow.Rent), "租金", 82));
+        _propertyGrid.Columns.Add(GridColumn(nameof(GamePropertyRow.Owner), "归属", 132));
         foreach (DataGridViewColumn column in _propertyGrid.Columns)
         {
-            column.MinimumWidth = column.Width;
+            column.AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
+            column.FillWeight = column.Width;
+            column.MinimumWidth = column.DataPropertyName == nameof(GamePropertyRow.Position) ? 44 : 70;
         }
     }
 
@@ -1828,16 +1891,21 @@ public class MainForm : Form
     {
         button.AutoSize = false;
         button.Dock = DockStyle.Fill;
-        button.Margin = new Padding(6, 10, 6, 10);
-        button.Height = 68;
-        button.MinimumSize = new Size(112, 58);
+        button.Margin = new Padding(4, 4, 4, 4);
+        button.Height = 58;
+        button.MinimumSize = Size.Empty;
         button.Padding = new Padding(0);
         button.FlatStyle = FlatStyle.Flat;
         button.FlatAppearance.BorderSize = 0;
+        button.FlatAppearance.BorderColor = Color.FromArgb(125, 51, 27);
+        button.FlatAppearance.CheckedBackColor = Color.FromArgb(125, 51, 27);
+        button.FlatAppearance.MouseDownBackColor = Color.FromArgb(101, 40, 22);
+        button.FlatAppearance.MouseOverBackColor = Color.FromArgb(150, 65, 34);
         button.BackColor = Color.FromArgb(125, 51, 27);
         button.ForeColor = Color.White;
-        button.Font = new Font("Microsoft YaHei UI", 13F, FontStyle.Bold);
+        button.Font = new Font("Microsoft YaHei UI", 12.5F, FontStyle.Bold);
         button.TextAlign = ContentAlignment.MiddleCenter;
+        button.UseCompatibleTextRendering = false;
     }
 
     private static Button SmallButton(string text, Action click)
@@ -2017,7 +2085,7 @@ internal sealed class SolidTextButton : Button
     {
         var backColor = Enabled
             ? BackColor
-            : Color.FromArgb(154, 120, 101);
+            : Color.FromArgb(128, 76, 49);
         if (ClientRectangle.Contains(PointToClient(Cursor.Position)) && Enabled)
         {
             backColor = ControlPaint.Light(backColor, 0.12f);
@@ -2026,19 +2094,17 @@ internal sealed class SolidTextButton : Button
         using var background = new SolidBrush(backColor);
         e.Graphics.FillRectangle(background, ClientRectangle);
 
+        e.Graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
+        using var textBrush = new SolidBrush(Enabled ? ForeColor : Color.FromArgb(242, 232, 218));
+        using var format = new StringFormat
+        {
+            Alignment = StringAlignment.Center,
+            LineAlignment = StringAlignment.Center,
+            Trimming = StringTrimming.EllipsisCharacter,
+            FormatFlags = StringFormatFlags.NoWrap
+        };
         var textRect = ClientRectangle;
-        textRect.Inflate(-Padding.Horizontal / 2, -Padding.Vertical / 2);
-        textRect.Offset(0, -1);
-        TextRenderer.DrawText(
-            e.Graphics,
-            Text,
-            Font,
-            textRect,
-            Enabled ? ForeColor : Color.FromArgb(235, 224, 214),
-            TextFormatFlags.HorizontalCenter
-                | TextFormatFlags.VerticalCenter
-                | TextFormatFlags.SingleLine
-                | TextFormatFlags.NoPrefix
-                | TextFormatFlags.NoClipping);
+        textRect.Inflate(-2, -2);
+        e.Graphics.DrawString(Text, Font, textBrush, textRect, format);
     }
 }

@@ -4,7 +4,6 @@ namespace MonopolyClient.Visuals;
 
 public static class AssetCatalog
 {
-    private const string ExternalAssetDirectory = @"C:\fu材料\素材";
     private static readonly Dictionary<string, Image> Cache = new(StringComparer.OrdinalIgnoreCase);
 
     public static readonly TokenOption[] TokenOptions =
@@ -121,25 +120,74 @@ public static class AssetCatalog
 
     private static string ResolveAssetDirectory()
     {
-        var assemblyDirectory = Path.GetDirectoryName(typeof(AssetCatalog).Assembly.Location);
-        if (!string.IsNullOrWhiteSpace(assemblyDirectory))
+        foreach (var candidate in EnumerateAssetDirectories())
         {
-            var assemblyAssets = Path.Combine(assemblyDirectory, "Assets");
-            if (Directory.Exists(assemblyAssets))
+            if (IsAssetDirectory(candidate))
             {
-                return assemblyAssets;
+                return candidate;
             }
         }
 
-        var appAssets = Path.Combine(AppContext.BaseDirectory, "Assets");
-        if (Directory.Exists(appAssets) && File.Exists(Path.Combine(appAssets, "登录界面.png")))
+        return AppContext.BaseDirectory;
+    }
+
+    private static IEnumerable<string> EnumerateAssetDirectories()
+    {
+        var anchors = new[]
         {
-            return appAssets;
+            Path.GetDirectoryName(typeof(AssetCatalog).Assembly.Location),
+            AppContext.BaseDirectory,
+            Directory.GetCurrentDirectory()
+        };
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var anchor in anchors.Where(x => !string.IsNullOrWhiteSpace(x)))
+        {
+            var directory = anchor;
+            while (!string.IsNullOrWhiteSpace(directory))
+            {
+                foreach (var candidate in new[]
+                {
+                    Path.Combine(directory, "Assets"),
+                    Path.Combine(directory, "MonopolyClient", "Assets")
+                })
+                {
+                    var fullPath = Path.GetFullPath(candidate);
+                    if (seen.Add(fullPath))
+                    {
+                        yield return fullPath;
+                    }
+                }
+
+                directory = Directory.GetParent(directory)?.FullName;
+            }
         }
 
-        return Directory.Exists(ExternalAssetDirectory)
-            ? ExternalAssetDirectory
-            : AppContext.BaseDirectory;
+        var sourceAssets = GetSourceAssetDirectory();
+        if (!string.IsNullOrWhiteSpace(sourceAssets))
+        {
+            var fullPath = Path.GetFullPath(sourceAssets);
+            if (seen.Add(fullPath))
+            {
+                yield return fullPath;
+            }
+        }
+    }
+
+    private static string? GetSourceAssetDirectory(
+        [System.Runtime.CompilerServices.CallerFilePath] string sourceFilePath = "")
+    {
+        var sourceDirectory = Path.GetDirectoryName(sourceFilePath);
+        return string.IsNullOrWhiteSpace(sourceDirectory)
+            ? null
+            : Path.GetFullPath(Path.Combine(sourceDirectory, "..", "Assets"));
+    }
+
+    private static bool IsAssetDirectory(string directory)
+    {
+        return Directory.Exists(directory)
+            && File.Exists(Path.Combine(directory, "棋盘中间.png"))
+            && File.Exists(Path.Combine(directory, "烩面.png"));
     }
 }
 
